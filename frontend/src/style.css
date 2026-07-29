@@ -1,0 +1,17 @@
+* {
+  box-sizing: border-box;
+  margin: 0;
+  padding: 0;
+}
+
+html,
+body,
+#app {
+  height: 100%;
+}
+
+body {
+  font-family: "JetBrains Mono Nerd Font";
+  font-size: 16px;
+  color: #1f1f1f;
+}

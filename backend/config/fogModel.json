@@ -1,0 +1,42 @@
+{
+  "cellSize": 50,
+
+  "cloudBase": {
+    "saturationRh": 95,
+    "lclCoefficient": 125
+  },
+  "cloudTop": {
+    "dryRh": 70,
+    "maxThickness": 1500
+  },
+  "windward": {
+    "aspectTolerance": 60,
+    "minSlope": 5,
+    "maxLowering": 80
+  },
+
+  "lwc": {
+    "adiabaticGradient": 2.0,
+    "subAdiabaticFactor": 0.5
+  },
+  "kunkel": {
+    "coefficient": 144.7,
+    "exponent": 0.88
+  },
+
+  "mist": {
+    "belowBaseBand": 150,
+    "saturationRh": 97
+  },
+  "lapseRate": {
+    "temperature": 9.8,
+    "dewPoint": 1.8
+  },
+
+  "classThresholds": { "yellow": 10000, "orange": 1000, "red": 100 },
+  "colors": {
+    "yellow": [255, 255, 0, 127],
+    "orange": [255, 127, 0, 127],
+    "red": [255, 0, 0, 127]
+  }
+}
