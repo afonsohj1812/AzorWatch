@@ -18,6 +18,8 @@ const config = JSON.parse(
 
 export const FOG_CLASS = { NONE: 0, YELLOW: 1, ORANGE: 2, RED: 3 };
 
+export const FOG_CLASS_NAMES = ["none", "yellow", "orange", "red"];
+
 const OCEAN = -32768;
 const HOURS_PER_DAY = 24;
 
