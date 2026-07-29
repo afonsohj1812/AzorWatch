@@ -2,17 +2,18 @@
   "cellSize": 50,
 
   "cloudBase": {
-    "saturationRh": 95,
+    "saturationRh": 99,
     "lclCoefficient": 125
   },
   "cloudTop": {
-    "dryRh": 70,
+    "exitRh": 95,
     "maxThickness": 1500
   },
   "windward": {
     "aspectTolerance": 60,
     "minSlope": 5,
-    "maxLowering": 80
+    "maxLowering": 80,
+    "fullEffectWindSpeed": 30
   },
 
   "lwc": {

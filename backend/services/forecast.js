@@ -3,9 +3,7 @@
 // One request covers every island: the API takes comma-separated coordinates and
 // returns an array in the same order. Free, no API key, 96 hourly steps, ~120 KB.
 //
-// Surface fields alone cannot place a cloud base, so we also pull temperature,
-// relative humidity and geopotential height on five pressure levels. That vertical
-// profile is what step 5 uses to find the saturation level and the trade inversion.
+// Surface fields alone cannot place a cloud base, so we also pull temperature, relative humidity and geopotential height on five pressure levels.
 
 import { islands } from "../shared/islands.js";
 
@@ -21,8 +19,8 @@ const SURFACE = [
   "wind_direction_10m",
 ];
 
-// Roughly sea level up to ~1000 m — the band the Azorean stratocumulus deck sits in.
-const LEVELS = [1000, 975, 950, 925, 900];
+// Sea level to ~2000 m. The lower five resolve the stratocumulus deck itself; 850 and 800 hPa are what let it find its top above 1 km, which matters because Pico reaches 2331 m and its summit often stands clear above the cloud.
+const LEVELS = [1000, 975, 950, 925, 900, 850, 800];
 
 const TTL_MS = Number(process.env.FORECAST_TTL_MINUTES ?? 30) * 60_000;
 
@@ -51,9 +49,7 @@ function shape(entry, island) {
   const h = entry.hourly;
   return {
     id: island.id,
-    // Open-Meteo snaps to its own grid cell, and in the Azores that cell is often
-    // high ground — Faial's is ~980 m. The surface fields are valid at THIS height,
-    // not at sea level, so step 5 must offset by it.
+    // Open-Meteo snaps to its own grid cell, and in the Azores that cell is often high ground — Faial's is ~980 m. The surface fields are valid at THIS height, not at sea level.
     elevation: entry.elevation,
     time: h.time,
     surface: Object.fromEntries(SURFACE.map((k) => [k, h[k]])),
@@ -72,14 +68,18 @@ async function fetchAll() {
 
   const body = await res.json();
   if (!Array.isArray(body) || body.length !== islands.length) {
-    throw new Error(`expected ${islands.length} locations, got ${body?.length}`);
+    throw new Error(
+      `expected ${islands.length} locations, got ${body?.length}`,
+    );
   }
 
   const byIsland = {};
   islands.forEach((island, i) => {
     const entry = body[i];
     if (entry.hourly?.time?.length !== 96) {
-      throw new Error(`${island.id}: expected 96 hours, got ${entry.hourly?.time?.length}`);
+      throw new Error(
+        `${island.id}: expected 96 hours, got ${entry.hourly?.time?.length}`,
+      );
     }
     byIsland[island.id] = shape(entry, island);
   });
@@ -104,7 +104,9 @@ export async function getForecast() {
     })
     .catch((err) => {
       if (cache) {
-        console.warn(`forecast refresh failed (${err.message}), serving cached`);
+        console.warn(
+          `forecast refresh failed (${err.message}), serving cached`,
+        );
         return cache.data;
       }
       throw err;
