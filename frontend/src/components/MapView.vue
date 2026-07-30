@@ -45,10 +45,10 @@ function showOverlay() {
 }
 
 onMounted(async () => {
-  map = L.map(container.value, { attributionControl: false }).setView(
-    [38.5, -28.2],
-    8,
-  );
+  map = L.map(container.value, {
+    attributionControl: false,
+    zoomControl: false,
+  }).setView([38.5, -28.2], 8);
 
   L.tileLayer(
     "https://server.arcgisonline.com/ArcGIS/rest/services/World_Imagery/MapServer/tile/{z}/{y}/{x}",
