@@ -1,4 +1,6 @@
 <script setup>
+import { computed } from "vue";
+
 import MapView from "./components/MapView.vue";
 import DayPicker from "./components/DayPicker.vue";
 import IslandPicker from "./components/IslandPicker.vue";
@@ -14,10 +16,15 @@ const {
   dayIndex,
   hours,
   hourIndex,
+  nowHour,
   overlayUrl,
   prefetchUrls,
   error,
 } = useForecast();
+
+const currentHour = computed(() =>
+  dayIndex.value === 0 ? nowHour.value : null,
+);
 </script>
 
 <template>
@@ -35,7 +42,11 @@ const {
       <IslandPicker v-model="islandId" :islands="islands" />
     </div>
     <div class="panel panel--bottom">
-      <HourSlider v-model="hourIndex" :hours="hours" />
+      <HourSlider
+        v-model="hourIndex"
+        :hours="hours"
+        :current-hour="currentHour"
+      />
     </div>
     <div class="panel panel--bottom-right">
       <Legend />

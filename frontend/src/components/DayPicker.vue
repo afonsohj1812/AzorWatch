@@ -19,7 +19,10 @@ defineEmits(["update:modelValue"]);
       @click="$emit('update:modelValue', i)"
     >
       <span class="dot" :style="{ background: colorOf(day.maxClass) }" />
-      <span class="name">{{ i === 0 ? "Today" : day.weekday }}</span>
+      <span class="name">
+        <span v-if="i === 0" class="live" />
+        {{ i === 0 ? "Today" : day.weekday }}
+      </span>
       <span class="date">{{ day.label }}</span>
     </button>
   </div>
@@ -65,8 +68,31 @@ defineEmits(["update:modelValue"]);
 }
 
 .name {
+  display: flex;
+  align-items: center;
+  gap: 0.25rem;
   font-size: 0.8rem;
   font-weight: bold;
+}
+
+.live {
+  width: 0.5rem;
+  height: 0.5rem;
+  border-radius: 50%;
+  background: rgb(63, 223, 127);
+  animation: pulse 2s ease-out infinite;
+}
+
+@keyframes pulse {
+  0% {
+    box-shadow: 0 0 0 0 rgb(63 223 127 / 0.5);
+  }
+  75% {
+    box-shadow: 0 0 0 0.5rem rgb(63 223 127 / 0);
+  }
+  100% {
+    box-shadow: 0 0 0 0 rgb(63 223 127 / 0);
+  }
 }
 
 .date {

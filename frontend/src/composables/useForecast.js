@@ -1,4 +1,4 @@
-import { ref, computed, watch } from "vue";
+import { ref, computed, watch, onScopeDispose } from "vue";
 
 const DEFAULT_ISLAND = "sao-miguel";
 
@@ -16,9 +16,13 @@ export function useForecast() {
   const islandId = ref(DEFAULT_ISLAND);
   const forecast = ref(null);
   const dayIndex = ref(0);
-  const hourIndex = ref(azoresHour());
+  const nowHour = ref(azoresHour());
+  const hourIndex = ref(nowHour.value);
   const loading = ref(false);
   const error = ref(null);
+
+  const ticker = setInterval(() => (nowHour.value = azoresHour()), 60_000);
+  onScopeDispose(() => clearInterval(ticker));
 
   async function load(url) {
     const res = await fetch(url);
@@ -78,6 +82,7 @@ export function useForecast() {
     hours,
     hour,
     hourIndex,
+    nowHour,
     overlayUrl,
     prefetchUrls,
     loading,

@@ -6,6 +6,7 @@ import { colorOf } from "../constants/fogClasses";
 const props = defineProps({
   hours: { type: Array, default: () => [] },
   modelValue: { type: Number, required: true },
+  currentHour: { type: Number, default: null },
 });
 const emit = defineEmits(["update:modelValue"]);
 
@@ -112,7 +113,7 @@ function onPointerUp(event) {
           v-for="(entry, i) in hours"
           :key="entry.time"
           class="tick"
-          :class="{ active: i === modelValue }"
+          :class="{ active: i === modelValue, now: i === currentHour }"
           :style="{ background: colorOf(entry.maxClass) }"
           :title="`${String(i).padStart(2, '0')}:00 — ${entry.maxClass}`"
         />
@@ -175,8 +176,25 @@ function onPointerUp(event) {
     filter 0.1s ease;
 }
 
+.tick.now {
+  outline: solid 2px rgb(63, 223, 127);
+  animation: pulse 2s ease-out infinite;
+}
+
 .tick.active {
   outline: solid 2px rgb(255 255 255);
+}
+
+@keyframes pulse {
+  0% {
+    box-shadow: 0 0 0 0 rgb(63 223 127 / 0.5);
+  }
+  75% {
+    box-shadow: 0 0 0 0.5rem rgb(63 223 127 / 0);
+  }
+  100% {
+    box-shadow: 0 0 0 0 rgb(63 223 127 / 0);
+  }
 }
 
 .track:not(.dragging) .tick:hover {
