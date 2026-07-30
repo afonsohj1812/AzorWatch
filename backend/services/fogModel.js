@@ -101,6 +101,32 @@ function depthForVisibility(visibility) {
   return (lwc * 1000) / perKm;
 }
 
+function visibilityForDepth(depth) {
+  const { coefficient, exponent } = config.kunkel;
+  const perKm = config.lwc.subAdiabaticFactor * config.lwc.adiabaticGradient;
+  const lwc = (perKm * depth) / 1000;
+  if (lwc <= 0) return null;
+
+  return 3912 / (coefficient * Math.pow(lwc, exponent));
+}
+
+function visibilityInYellow(z, base, c) {
+  const { yellow, orange } = config.classThresholds;
+
+  const bottom = Math.min(base - config.mist.belowBaseBand, c.mist);
+  const top = base + c.orangeDepth;
+  if (!(top > bottom)) return orange;
+
+  const fraction = Math.min(1, Math.max(0, (z - bottom) / (top - bottom)));
+  return yellow * Math.pow(orange / yellow, fraction);
+}
+
+export function visibilityAt(z, base, fogClass, c) {
+  if (fogClass === FOG_CLASS.NONE) return null;
+  if (fogClass === FOG_CLASS.YELLOW) return visibilityInYellow(z, base, c);
+  return visibilityForDepth(z - base);
+}
+
 // Height at which the surface air, cooled along its lapse rate, reaches the mist
 // threshold. Below the cloud base this is what produces the yellow band.
 function mistHeight(temperature, dewPoint, modelElevation) {
@@ -180,6 +206,26 @@ function windwardLowering(aspectDegrees, slopeDegrees, wind) {
   return config.windward.maxLowering * facing * strength;
 }
 
+export function localBase(aspectByte, slopeDegrees, c) {
+  return c.base - windwardLowering(aspectByte * 2, slopeDegrees, c);
+}
+
+export function classifyCell(z, base, c) {
+  if (z === OCEAN || z > c.top) return FOG_CLASS.NONE;
+
+  const depth = z - base;
+  if (depth >= 0) {
+    return depth >= c.redDepth
+      ? FOG_CLASS.RED
+      : depth >= c.orangeDepth
+        ? FOG_CLASS.ORANGE
+        : FOG_CLASS.YELLOW;
+  }
+  if (-depth <= config.mist.belowBaseBand || z >= c.mist)
+    return FOG_CLASS.YELLOW;
+  return FOG_CLASS.NONE;
+}
+
 export function classifyHour(dem, forecast, hour) {
   const c = hourConditions(forecast, hour);
   const { elevation, aspect, slope } = dem;
@@ -188,22 +234,7 @@ export function classifyHour(dem, forecast, hour) {
   for (let i = 0; i < elevation.length; i++) {
     const z = elevation[i];
     if (z === OCEAN) continue;
-
-    const base = c.base - windwardLowering(aspect[i] * 2, slope[i], c);
-
-    if (z > c.top) continue; // above the deck, in clear air
-
-    const depth = z - base;
-    if (depth >= 0) {
-      classes[i] =
-        depth >= c.redDepth
-          ? FOG_CLASS.RED
-          : depth >= c.orangeDepth
-            ? FOG_CLASS.ORANGE
-            : FOG_CLASS.YELLOW; // in cloud but too shallow to thicken
-    } else if (-depth <= config.mist.belowBaseBand || z >= c.mist) {
-      classes[i] = FOG_CLASS.YELLOW;
-    }
+    classes[i] = classifyCell(z, localBase(aspect[i], slope[i], c), c);
   }
 
   return classes;
@@ -263,4 +294,40 @@ export async function getIslandFog(id) {
   };
   bundles.set(id, bundle);
   return bundle;
+}
+
+export async function inspectPoint(id, hour, x, y) {
+  const fog = await getIslandFog(id);
+  if (!fog || hour < 0 || hour >= fog.time.length) return null;
+  if (x < 0 || y < 0 || x >= fog.width || y >= fog.height) return null;
+
+  const dem = await loadDem(id);
+  const index = y * fog.width + x;
+  const z = dem.elevation[index];
+
+  const point = {
+    time: fog.time[hour],
+    x,
+    y,
+    sea: z === OCEAN,
+    class: FOG_CLASS_NAMES[fog.grids[hour][index]],
+  };
+
+  if (point.sea) return point;
+
+  const c = hourConditions((await getForecast()).islands[id], hour);
+  const base = localBase(dem.aspect[index], dem.slope[index], c);
+  const fogClass = fog.grids[hour][index];
+
+  return {
+    ...point,
+    elevation: z,
+    slope: dem.slope[index],
+    aspect: dem.aspect[index] * 2,
+    cloudBase: Math.round(base),
+    cloudTop: Math.round(c.top),
+    depth: Math.round(z - base),
+    aboveCloud: z > c.top,
+    visibility: visibilityAt(z, base, fogClass, c),
+  };
 }

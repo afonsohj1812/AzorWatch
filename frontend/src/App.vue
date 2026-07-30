@@ -6,6 +6,7 @@ import DayPicker from "./components/DayPicker.vue";
 import IslandPicker from "./components/IslandPicker.vue";
 import HourSlider from "./components/HourSlider.vue";
 import Legend from "./components/Legend.vue";
+import PointInfo from "./components/PointInfo.vue";
 import { useForecast } from "./composables/useForecast";
 
 const {
@@ -19,6 +20,9 @@ const {
   nowHour,
   overlayUrl,
   prefetchUrls,
+  grid,
+  point,
+  inspect,
   error,
 } = useForecast();
 
@@ -33,6 +37,8 @@ const currentHour = computed(() =>
       :island="island"
       :overlay-url="overlayUrl"
       :prefetch-urls="prefetchUrls"
+      :grid="grid"
+      @inspect="inspect"
     />
 
     <div class="panel panel--top">
@@ -40,6 +46,9 @@ const currentHour = computed(() =>
     </div>
     <div class="panel panel--left">
       <IslandPicker v-model="islandId" :islands="islands" />
+    </div>
+    <div class="panel panel--right">
+      <PointInfo :point="point" />
     </div>
     <div class="panel panel--bottom">
       <HourSlider
@@ -79,6 +88,12 @@ const currentHour = computed(() =>
 .panel--left {
   top: 50%;
   left: 1rem;
+  transform: translateY(-50%);
+}
+
+.panel--right {
+  top: 50%;
+  right: 1rem;
   transform: translateY(-50%);
 }
 

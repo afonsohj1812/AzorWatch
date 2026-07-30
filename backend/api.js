@@ -1,7 +1,11 @@
 import { Router } from "express";
 
 import { islands, getIsland } from "./shared/islands.js";
-import { getIslandFog, FOG_CLASS_NAMES } from "./services/fogModel.js";
+import {
+  getIslandFog,
+  inspectPoint,
+  FOG_CLASS_NAMES,
+} from "./services/fogModel.js";
 import { renderOverlay } from "./services/render.js";
 
 const api = Router();
@@ -58,6 +62,8 @@ api.get("/forecast/:islandId", async (req, res, next) => {
       island: islandId,
       runAt: fog.runAt,
       bbox: fog.bbox,
+      width: fog.width,
+      height: fog.height,
       days,
     });
   } catch (err) {
@@ -88,6 +94,30 @@ api.get("/fog/:islandId/:hour.png", async (req, res, next) => {
     if (req.headers["if-none-match"] === overlay.etag)
       return res.status(304).end();
     res.send(overlay.buffer);
+  } catch (err) {
+    next(err);
+  }
+});
+
+api.get("/point/:islandId/:hour", async (req, res, next) => {
+  try {
+    const { islandId, hour } = req.params;
+    if (!getIsland(islandId))
+      return res.status(404).json({ error: "unknown island" });
+
+    const x = Number(req.query.x);
+    const y = Number(req.query.y);
+    if (!Number.isInteger(x) || !Number.isInteger(y))
+      return res.status(400).json({ error: "x and y required" });
+
+    const fog = await getIslandFog(islandId);
+    const index = fog.time.indexOf(hour);
+    if (index === -1) return res.status(404).json({ error: "unknown hour" });
+
+    const point = await inspectPoint(islandId, index, x, y);
+    if (!point) return res.json(null);
+
+    res.json(point);
   } catch (err) {
     next(err);
   }

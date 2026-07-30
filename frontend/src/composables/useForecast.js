@@ -72,7 +72,50 @@ export function useForecast() {
       .map((i) => fogUrl(hours.value[i].time)),
   );
 
+  const grid = computed(() =>
+    forecast.value
+      ? { width: forecast.value.width, height: forecast.value.height }
+      : null,
+  );
+
+  const point = ref(null);
+  let pending = null;
+  let lastCall = 0;
+
+  function inspect(target) {
+    if (!target || !hour.value) {
+      pending?.abort();
+      pending = null;
+      point.value = null;
+      return;
+    }
+
+    const wait = Math.max(0, 80 - (Date.now() - lastCall));
+    clearTimeout(inspect.timer);
+    inspect.timer = setTimeout(() => {
+      lastCall = Date.now();
+      pending?.abort();
+      pending = new AbortController();
+
+      const url = `/api/point/${islandId.value}/${hour.value.time}?x=${target.x}&y=${target.y}`;
+      fetch(url, { signal: pending.signal })
+        .then((res) => (res.ok ? res.json() : null))
+        .then((data) => {
+          point.value = data;
+        })
+        .catch(() => {});
+    }, wait);
+  }
+
+  onScopeDispose(() => {
+    clearTimeout(inspect.timer);
+    pending?.abort();
+  });
+
   return {
+    grid,
+    point,
+    inspect,
     islands,
     islandId,
     island,
