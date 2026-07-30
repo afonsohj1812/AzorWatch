@@ -1,33 +1,49 @@
 <script setup>
-import { ref } from "vue";
-
 import MapView from "./components/MapView.vue";
 import DayPicker from "./components/DayPicker.vue";
 import IslandPicker from "./components/IslandPicker.vue";
 import HourSlider from "./components/HourSlider.vue";
 import Legend from "./components/Legend.vue";
+import { useForecast } from "./composables/useForecast";
 
-const selectedIsland = ref("sao-miguel");
-const selectedDay = ref(0);
-const selectedHour = ref(12);
+const {
+  islands,
+  islandId,
+  island,
+  days,
+  dayIndex,
+  hours,
+  hourIndex,
+  overlayUrl,
+  prefetchUrls,
+  error,
+} = useForecast();
 </script>
 
 <template>
   <div class="app">
-    <MapView :island="selectedIsland" :day="selectedDay" :hour="selectedHour" />
+    <MapView
+      :island="island"
+      :overlay-url="overlayUrl"
+      :prefetch-urls="prefetchUrls"
+    />
 
     <div class="panel panel--top">
-      <DayPicker v-model="selectedDay" />
+      <DayPicker v-model="dayIndex" :days="days" />
     </div>
     <div class="panel panel--left">
-      <IslandPicker v-model="selectedIsland" />
+      <IslandPicker v-model="islandId" :islands="islands" />
     </div>
     <div class="panel panel--bottom">
-      <HourSlider v-model="selectedHour" />
+      <HourSlider v-model="hourIndex" :hours="hours" />
     </div>
     <div class="panel panel--bottom-right">
       <Legend />
     </div>
+
+    <p class="panel credits">
+      Imagery &copy; Esri &middot; Elevation &copy; Copernicus
+    </p>
   </div>
 </template>
 
@@ -63,7 +79,15 @@ const selectedHour = ref(12);
 }
 
 .panel--bottom-right {
-  right: 1rem;
   bottom: 1rem;
+  right: 1rem;
+}
+
+.credits {
+  bottom: 0.5rem;
+  left: 0.5rem;
+  font-size: 0.75rem;
+  color: rgb(127, 127, 127);
+  pointer-events: none;
 }
 </style>

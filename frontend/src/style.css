@@ -1,4 +1,7 @@
 * {
+  font-family: "Segoe UI", Tahoma, Geneva, Verdana, sans-serif;
+  font-size: 1rem;
+  color: rgb(223, 223, 223);
   box-sizing: border-box;
   margin: 0;
   padding: 0;
@@ -10,8 +13,10 @@ body,
   height: 100%;
 }
 
-body {
-  font-family: "JetBrains Mono Nerd Font";
-  font-size: 16px;
-  color: #1f1f1f;
+.glass {
+  background: rgba(159, 207, 255, 0.2);
+  backdrop-filter: blur(16px) saturate(100%);
+  border: 1px solid rgba(159, 207, 255, 0.25);
+  border-radius: 0.5rem;
+  box-shadow: 0 4px 32px rgba(0, 0, 0, 0.1);
 }
