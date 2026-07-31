@@ -145,6 +145,8 @@ export function hourConditions(forecast, hour) {
   };
 }
 
+const radians = (degrees) => (degrees * Math.PI) / 180;
+
 function windwardLowering(aspectDegrees, slopeDegrees, wind) {
   if (slopeDegrees < config.windward.minSlope) return 0;
 
@@ -157,7 +159,13 @@ function windwardLowering(aspectDegrees, slopeDegrees, wind) {
     1,
     wind.windSpeed / config.windward.fullEffectWindSpeed,
   );
-  return config.windward.maxLowering * facing * strength;
+  const steepness = Math.min(
+    1,
+    Math.sin(radians(slopeDegrees)) /
+      Math.sin(radians(config.windward.fullEffectSlope)),
+  );
+
+  return config.windward.maxLowering * facing * strength * steepness;
 }
 
 export function localBase(aspectByte, slopeDegrees, c) {

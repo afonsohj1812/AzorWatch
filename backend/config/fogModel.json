@@ -13,7 +13,8 @@
     "aspectTolerance": 60,
     "minSlope": 5,
     "maxLowering": 80,
-    "fullEffectWindSpeed": 30
+    "fullEffectWindSpeed": 30,
+    "fullEffectSlope": 30
   },
 
   "lwc": {
