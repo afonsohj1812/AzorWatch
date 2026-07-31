@@ -91,7 +91,7 @@ const depthText = computed(() => {
 }
 
 dt {
-  color: rgb(255 255 255 / 0.55);
+  color: rgb(255 255 255 / 0.5);
 }
 
 dd {

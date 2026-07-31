@@ -1,8 +1,3 @@
-// Loads the 50 m grids written by scripts/prepare-dem.js.
-//
-// Layout: uint32 header length, JSON header (padded to 4 bytes), then Int16
-// elevation, Uint8 aspect (degrees/2) and Uint8 slope (degrees).
-
 import { readFile } from "node:fs/promises";
 
 const DEM_DIR = "data/dem";
@@ -17,8 +12,6 @@ export async function loadDem(id) {
   const header = JSON.parse(buf.subarray(4, 4 + headerLength));
   const cells = header.width * header.height;
 
-  // The header is padded so this lands 4-byte aligned, but readFile can hand back
-  // a pooled buffer at an odd offset — copy in that case rather than throwing.
   let base = buf.byteOffset + 4 + headerLength;
   let source = buf.buffer;
   if (base % 4 !== 0) {

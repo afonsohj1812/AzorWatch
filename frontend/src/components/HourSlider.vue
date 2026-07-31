@@ -115,7 +115,6 @@ function onPointerUp(event) {
           class="tick"
           :class="{ active: i === modelValue, now: i === currentHour }"
           :style="{ background: colorOf(entry.maxClass) }"
-          :title="`${String(i).padStart(2, '0')}:00 — ${entry.maxClass}`"
         />
       </div>
     </div>

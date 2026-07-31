@@ -1,12 +1,3 @@
-// Turns a coarse hourly forecast into 50 m fog pixels.
-//
-// No weather model resolves fog at 50 m. What the forecast does give is the height
-// of the cloud layer: a base, a top, and how saturated the air is between them. The
-// DEM supplies each cell's elevation, so the layer can be intersected with the
-// terrain — below the base is clear, inside it is fog that thickens with depth, and
-// above the top is clear again. That last case is why Pico's summit often stands in
-// sunshine while its flanks are socked in.
-
 import { readFileSync } from "node:fs";
 
 import { loadDem } from "./dem.js";
@@ -23,14 +14,9 @@ export const FOG_CLASS_NAMES = ["none", "yellow", "orange", "red"];
 const OCEAN = -32768;
 const HOURS_PER_DAY = 24;
 
-// Saturation vapour pressure (Magnus), used only as a ratio so the units cancel.
 const es = (t) => 6.112 * Math.exp((17.67 * t) / (t + 243.5));
 const rhFrom = (t, td) => 100 * (es(td) / es(t));
 
-// --- vertical structure -----------------------------------------------------
-
-// Lowest height where the profile reaches saturation, interpolated between levels.
-// Returns null when no level is saturated.
 function saturationHeight(profile) {
   const target = config.cloudBase.saturationRh;
   for (let i = 0; i < profile.length; i++) {
@@ -45,25 +31,12 @@ function saturationHeight(profile) {
   return null;
 }
 
-// The lifting condensation level, as a height above sea level.
-//
-// Open-Meteo's surface fields are valid at ITS model grid cell, which in the Azores
-// is often high ground (Faial ~980 m). The LCL is a height above that cell, so the
-// cell elevation has to be added back or every cloud base lands hundreds of metres
-// too low.
 function lclHeight(temperature, dewPoint, modelElevation) {
   return (
     modelElevation + config.cloudBase.lclCoefficient * (temperature - dewPoint)
   );
 }
 
-// Top of the deck: where the air dries back out above the base, or where a
-// temperature inversion caps it.
-//
-// The exit threshold sits just below the saturation one rather than at some much
-// drier value — around the Azores the air above a stratocumulus deck is still
-// humid (RH stays near 90 % well past 2 km), so a low threshold like 70 % never
-// fires and every deck ends up at the thickness cap.
 function cloudTopHeight(profile, base) {
   const cap = base + config.cloudTop.maxThickness;
   const exit = config.cloudTop.exitRh;
@@ -85,15 +58,6 @@ function cloudTopHeight(profile, base) {
   return cap;
 }
 
-// --- per-hour thresholds ----------------------------------------------------
-
-// Visibility inside cloud depends only on how far above the base a cell sits, so
-// the class boundaries can be solved once per hour as depths and the inner loop
-// reduced to two comparisons.
-//
-//   LWC  = subAdiabatic * gradient * depth/1000       (g/m3, adiabatic growth)
-//   beta = C * LWC^e                                  (Kunkel, km^-1)
-//   vis  = 3912 / beta                                (metres)
 function depthForVisibility(visibility) {
   const { coefficient, exponent } = config.kunkel;
   const lwc = Math.pow(3912 / (coefficient * visibility), 1 / exponent);
@@ -127,15 +91,11 @@ export function visibilityAt(z, base, fogClass, c) {
   return visibilityForDepth(z - base);
 }
 
-// Height at which the surface air, cooled along its lapse rate, reaches the mist
-// threshold. Below the cloud base this is what produces the yellow band.
 function mistHeight(temperature, dewPoint, modelElevation) {
   const target = config.mist.saturationRh;
   const dT = config.lapseRate.temperature / 1000;
   const dTd = config.lapseRate.dewPoint / 1000;
 
-  // Dew point falls more slowly than temperature, so RH rises monotonically with
-  // height — a plain bisection is enough.
   let low = modelElevation;
   let high = modelElevation + 3000;
   if (rhFrom(temperature, dewPoint) >= target) return low;
@@ -162,7 +122,6 @@ function hourlyProfile(forecast, hour) {
     .sort((a, b) => a.height - b.height);
 }
 
-// Everything the cell loop needs, computed once per island-hour.
 export function hourConditions(forecast, hour) {
   const surface = forecast.surface;
   const temperature = surface.temperature_2m[hour];
@@ -186,11 +145,6 @@ export function hourConditions(forecast, hour) {
   };
 }
 
-// --- classification ---------------------------------------------------------
-
-// Upslope flow saturates earlier on the flank facing the wind, so the base sits
-// lower there. Aspect is the bearing a slope faces and wind_direction_10m is the
-// bearing the wind comes from, so they compare directly.
 function windwardLowering(aspectDegrees, slopeDegrees, wind) {
   if (slopeDegrees < config.windward.minSlope) return 0;
 
@@ -240,13 +194,8 @@ export function classifyHour(dem, forecast, hour) {
   return classes;
 }
 
-// --- whole-island bundle ----------------------------------------------------
-
 const bundles = new Map();
 
-// All 96 hours for one island: the class grids the renderer draws, plus the per-hour
-// and per-day maxima the slider ticks and day circles need. Roughly 600 k cells an
-// hour is cheap enough to do in one pass and cache against the forecast run.
 export async function getIslandFog(id) {
   const { runAt, islands } = await getForecast();
   const forecast = islands[id];

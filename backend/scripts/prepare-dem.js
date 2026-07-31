@@ -1,9 +1,3 @@
-// Build the 50 m elevation/slope/aspect grids the fog model runs on.
-//
-//   docker compose run --rm backend node scripts/prepare-dem.js
-//
-// Downloads Copernicus GLO-30 tiles into data/cache/, resamples each island onto its own 50 m grid, derives slope and aspect, and writes data/dem/<island>.bin. Exits non-zero if the summit or land-area assertions fail, so bad data never ships.
-
 import { mkdir, writeFile, access } from "node:fs/promises";
 import { createWriteStream } from "node:fs";
 import { Readable } from "node:stream";
@@ -19,10 +13,8 @@ const CELL_SIZE = 50;
 const M_PER_DEG_LAT = 111320;
 const OCEAN = -32768;
 
-// Copernicus GLO-30: 1 arc-second, so 3600 px per degree, one degree per tile.
 const PX_PER_DEG = 3600;
 
-// A global pixel grid spanning the whole archipelago lets bilinear sampling cross tile seams without any special cases — Graciosa straddles two of them.
 const ORIGIN_LON = -32;
 const ORIGIN_LAT = 40;
 
@@ -35,7 +27,6 @@ function tileName(south, west) {
   return `${ns}_00_${ew}_00`;
 }
 
-// Every 1x1 degree tile any island bbox touches.
 function requiredTiles() {
   const names = new Set();
   for (const { bbox } of islands) {
@@ -64,7 +55,6 @@ async function download(name) {
 
   const res = await fetch(tileUrl(name));
   if (res.status === 404) {
-    // Ocean-only tiles are simply absent from the dataset.
     console.log(`  ${name}  not published (open ocean), treating as sea`);
     return null;
   }
@@ -75,8 +65,6 @@ async function download(name) {
   return path;
 }
 
-// Tiles are Float32 with a large sentinel over water. Narrow to Int16 meters on load:
-// halves the resident memory and matches the precision we actually store.
 async function loadTile(path) {
   const image = await (await fromFile(path)).getImage();
   const [raster] = await image.readRasters();
@@ -102,7 +90,6 @@ async function loadTiles() {
   return tiles;
 }
 
-// Elevation at an integer global pixel, or 0 (sea) outside any published tile.
 function pixelAt(tiles, ix, iy) {
   const tx = Math.floor(ix / PX_PER_DEG);
   const ty = Math.floor(iy / PX_PER_DEG);
@@ -160,8 +147,6 @@ function buildIsland(tiles, island) {
   return { width, height, dLat, dLon, elevation, slope, aspect, land };
 }
 
-// Horn 3x3 on the island grid itself, so spacing is exactly CELL_SIZE in both axes.
-// Aspect is the compass bearing the slope faces (downhill), which is directly comparable to Open-Meteo's "direction the wind blows from".
 function deriveSlopeAspect(elevation, width, height) {
   const slope = new Uint8Array(width * height);
   const aspect = new Uint8Array(width * height);
@@ -209,8 +194,6 @@ async function writeGrid(island, grid) {
     cellSize: CELL_SIZE,
     ocean: OCEAN,
   });
-  // Pad so the Int16 elevations start 4-byte aligned and dem.js can map them
-  // straight onto the buffer with no copy.
   const header = Buffer.from(json.padEnd(Math.ceil(json.length / 4) * 4));
   const length = Buffer.alloc(4);
   length.writeUInt32LE(header.length);
@@ -231,9 +214,6 @@ async function writeGrid(island, grid) {
   );
 }
 
-// Peaks that must survive the resample, and the archipelago's real land area.
-// A wrong TIFF decode still produces plausible-looking numbers, so this is the
-// only thing standing between a silent corruption and the fog model.
 const SUMMITS = [
   ["pico", "Pico", 38.4687, -28.3994, 2351],
   ["sao-miguel", "Pico da Vara", 37.8097, -25.2107, 1103],
@@ -246,7 +226,7 @@ const SUMMITS = [
   ["corvo", "Estreitinho", 39.6993, -31.1152, 718],
 ];
 
-const SUMMIT_TOLERANCE = 60; // meters, covers 30 m -> 50 m resampling loss
+const SUMMIT_TOLERANCE = 60;
 const TOTAL_LAND_KM2 = 2322;
 const AREA_TOLERANCE = 0.15;
 
@@ -258,7 +238,6 @@ function verify(grids) {
     const grid = grids.get(id);
     const [west, south, east, north] = island.bbox;
 
-    // Peaks shift a cell or two under resampling, so take the local maximum.
     const cx = Math.round((lon - west) / grid.dLon - 0.5);
     const cy = Math.round((north - lat) / grid.dLat - 0.5);
     let peak = 0;

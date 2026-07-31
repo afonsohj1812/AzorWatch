@@ -1,10 +1,3 @@
-// Hourly forecast for all nine islands from Open-Meteo — today plus three days.
-//
-// One request covers every island: the API takes comma-separated coordinates and
-// returns an array in the same order. Free, no API key, 96 hourly steps, ~120 KB.
-//
-// Surface fields alone cannot place a cloud base, so we also pull temperature, relative humidity and geopotential height on five pressure levels.
-
 import { islands } from "../shared/islands.js";
 
 const API = "https://api.open-meteo.com/v1/forecast";
@@ -19,7 +12,6 @@ const SURFACE = [
   "wind_direction_10m",
 ];
 
-// Sea level to ~2000 m. The lower five resolve the stratocumulus deck itself; 850 and 800 hPa are what let it find its top above 1 km, which matters because Pico reaches 2331 m and its summit often stands clear above the cloud.
 const LEVELS = [1000, 975, 950, 925, 900, 850, 800];
 
 const TTL_MS = Number(process.env.FORECAST_TTL_MINUTES ?? 30) * 60_000;
@@ -49,7 +41,6 @@ function shape(entry, island) {
   const h = entry.hourly;
   return {
     id: island.id,
-    // Open-Meteo snaps to its own grid cell, and in the Azores that cell is often high ground — Faial's is ~980 m. The surface fields are valid at THIS height, not at sea level.
     elevation: entry.elevation,
     time: h.time,
     surface: Object.fromEntries(SURFACE.map((k) => [k, h[k]])),
@@ -91,8 +82,6 @@ async function fetchAll() {
   };
 }
 
-// Cached for TTL_MS. A failed refresh keeps serving the previous response rather
-// than taking the whole app down — a slightly old fog forecast beats none.
 export async function getForecast() {
   if (cache && Date.now() - cache.fetchedAt < TTL_MS) return cache.data;
   if (inFlight) return inFlight;

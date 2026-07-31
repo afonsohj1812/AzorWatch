@@ -1,10 +1,3 @@
-// Renders a class grid as a translucent PNG for Leaflet to drape over the map.
-//
-// One image per island-hour. Ocean and no-fog are fully transparent, so the
-// basemap shows through and the overlay is just the fog. The data is blocky and
-// mostly empty, which PNG compresses very well — tens of KB for a grid that is
-// megabytes raw.
-
 import { readFileSync } from "node:fs";
 import { PNG } from "pngjs";
 
@@ -14,8 +7,6 @@ const config = JSON.parse(
   readFileSync(new URL("../config/fogModel.json", import.meta.url)),
 );
 
-// Class index -> RGBA. NONE stays fully transparent, so ocean and clear land
-// leave the basemap untouched.
 const PALETTE = [
   [0, 0, 0, 0],
   config.colors.yellow,
@@ -51,7 +42,6 @@ export async function renderOverlay(id, hour) {
     width: fog.width,
     height: fog.height,
     time: fog.time[hour],
-    // The forecast run is in the key, so a new run invalidates every image.
     etag: `"${fog.runAt}:${id}:${hour}"`,
   };
 
