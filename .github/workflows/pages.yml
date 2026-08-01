@@ -1,0 +1,65 @@
+name: Deploy demo to Pages
+
+on:
+  push:
+    branches: [main]
+  schedule:
+    - cron: "0 */6 * * *"
+  workflow_dispatch:
+
+permissions:
+  contents: read
+  pages: write
+  id-token: write
+
+concurrency:
+  group: pages
+  cancel-in-progress: false
+
+jobs:
+  build:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/cache@v4
+        id: dem
+        with:
+          path: backend/data
+          key: dem-${{ hashFiles('backend/scripts/prepare-dem.js', 'backend/shared/islands.js') }}
+
+      - name: Build images
+        run: docker compose build
+
+      - name: Build elevation grids
+        if: steps.dem.outputs.cache-hit != 'true'
+        run: docker compose run --rm backend node scripts/prepare-dem.js
+
+      - name: Export the API as static files
+        run: docker compose run --rm backend node scripts/export-static.js
+
+      - name: Build the frontend
+        run: |
+          docker compose run --rm \
+            -e VITE_BASE=/BrumaWatch/ \
+            -e VITE_STATIC=1 \
+            frontend npm run build
+
+      - name: Add the exported API to the site
+        run: |
+          docker compose run --rm -v "$PWD/frontend/dist:/site" \
+            backend cp -r dist-api /site/api
+
+      - uses: actions/upload-pages-artifact@v3
+        with:
+          path: frontend/dist
+
+  deploy:
+    needs: build
+    runs-on: ubuntu-latest
+    environment:
+      name: github-pages
+      url: ${{ steps.deployment.outputs.page_url }}
+    steps:
+      - id: deployment
+        uses: actions/deploy-pages@v4

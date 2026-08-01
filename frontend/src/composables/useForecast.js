@@ -1,5 +1,17 @@
 import { ref, computed, watch, onScopeDispose } from "vue";
 
+import {
+  isStatic,
+  islandsUrl,
+  forecastUrl,
+  fogUrl,
+  pointUrl,
+  demUrl,
+  configUrl,
+} from "../api";
+import { fetchDem } from "../lib/dem";
+import { createFogMath, FOG_CLASS_NAMES, OCEAN } from "../shared/fogMath";
+
 const DEFAULT_ISLAND = "sao-miguel";
 
 const azoresHour = () =>
@@ -34,7 +46,7 @@ export function useForecast() {
     loading.value = true;
     error.value = null;
     try {
-      forecast.value = await load(`/api/forecast/${id}`);
+      forecast.value = await load(forecastUrl(id));
     } catch (err) {
       error.value = err.message;
       forecast.value = null;
@@ -43,7 +55,7 @@ export function useForecast() {
     }
   }
 
-  load("/api/islands")
+  load(islandsUrl())
     .then((list) => {
       islands.value = list;
     })
@@ -61,15 +73,15 @@ export function useForecast() {
   const hours = computed(() => day.value?.hours ?? []);
   const hour = computed(() => hours.value[hourIndex.value] ?? null);
 
-  const fogUrl = (time) => `/api/fog/${islandId.value}/${time}.png`;
+  const overlayFor = (time) => fogUrl(islandId.value, time);
   const overlayUrl = computed(() =>
-    hour.value ? fogUrl(hour.value.time) : null,
+    hour.value ? overlayFor(hour.value.time) : null,
   );
 
   const prefetchUrls = computed(() =>
     [hourIndex.value - 1, hourIndex.value + 1]
       .filter((i) => i >= 0 && i < hours.value.length)
-      .map((i) => fogUrl(hours.value[i].time)),
+      .map((i) => overlayFor(hours.value[i].time)),
   );
 
   const grid = computed(() =>
@@ -81,6 +93,40 @@ export function useForecast() {
   const point = ref(null);
   let pending = null;
   let lastCall = 0;
+
+  let math = null;
+
+  async function inspectLocally(x, y) {
+    if (!math) math = createFogMath(await (await fetch(configUrl())).json());
+
+    const dem = await fetchDem(demUrl(islandId.value));
+    const index = y * dem.width + x;
+    const z = dem.elevation[index];
+
+    const base = { time: hour.value.time, x, y };
+    if (z === OCEAN) return { ...base, sea: true, class: "none" };
+
+    const raw =
+      forecast.value.conditions[dayIndex.value * 24 + hourIndex.value];
+    const c = { ...raw, mist: raw.mist ?? Infinity };
+
+    const cloudBase = math.localBase(dem.aspect[index], dem.slope[index], c);
+    const fogClass = math.classifyCell(z, cloudBase, c);
+
+    return {
+      ...base,
+      sea: false,
+      class: FOG_CLASS_NAMES[fogClass],
+      elevation: z,
+      slope: dem.slope[index],
+      aspect: dem.aspect[index] * 2,
+      cloudBase: Math.round(cloudBase),
+      cloudTop: Math.round(c.top),
+      depth: Math.round(z - cloudBase),
+      aboveCloud: z > c.top,
+      visibility: math.visibilityAt(z, cloudBase, fogClass, c),
+    };
+  }
 
   function inspect(target) {
     if (!target || !hour.value) {
@@ -94,11 +140,22 @@ export function useForecast() {
     clearTimeout(inspect.timer);
     inspect.timer = setTimeout(() => {
       lastCall = Date.now();
+
+      if (isStatic) {
+        inspectLocally(target.x, target.y)
+          .then((data) => {
+            point.value = data;
+          })
+          .catch(() => {});
+        return;
+      }
+
       pending?.abort();
       pending = new AbortController();
 
-      const url = `/api/point/${islandId.value}/${hour.value.time}?x=${target.x}&y=${target.y}`;
-      fetch(url, { signal: pending.signal })
+      fetch(pointUrl(islandId.value, hour.value.time, target.x, target.y), {
+        signal: pending.signal,
+      })
         .then((res) => (res.ok ? res.json() : null))
         .then((data) => {
           point.value = data;

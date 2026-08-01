@@ -3,27 +3,12 @@ import { Router } from "express";
 import { islands, getIsland } from "./shared/islands.js";
 import {
   getIslandFog,
+  getIslandSummary,
   inspectPoint,
-  FOG_CLASS_NAMES,
 } from "./services/fogModel.js";
 import { renderOverlay } from "./services/render.js";
 
 const api = Router();
-
-const HOURS_PER_DAY = 24;
-
-const asUtc = (date) => new Date(`${date}T00:00:00Z`);
-const dayLabel = (date) =>
-  asUtc(date).toLocaleDateString("en-GB", {
-    day: "numeric",
-    month: "long",
-    timeZone: "UTC",
-  });
-const weekday = (date) =>
-  asUtc(date).toLocaleDateString("en-GB", {
-    weekday: "short",
-    timeZone: "UTC",
-  });
 
 api.get("/health", (req, res) => {
   res.json({ ok: true, islands: islands.length });
@@ -39,33 +24,7 @@ api.get("/forecast/:islandId", async (req, res, next) => {
     if (!getIsland(islandId))
       return res.status(404).json({ error: "unknown island" });
 
-    const fog = await getIslandFog(islandId);
-    const days = [];
-
-    for (let day = 0; day < fog.dayMax.length; day++) {
-      const start = day * HOURS_PER_DAY;
-      const date = fog.time[start].slice(0, 10);
-
-      days.push({
-        date,
-        label: dayLabel(date),
-        weekday: weekday(date),
-        maxClass: FOG_CLASS_NAMES[fog.dayMax[day]],
-        hours: Array.from({ length: HOURS_PER_DAY }, (_, h) => ({
-          time: fog.time[start + h],
-          maxClass: FOG_CLASS_NAMES[fog.hourMax[start + h]],
-        })),
-      });
-    }
-
-    res.json({
-      island: islandId,
-      runAt: fog.runAt,
-      bbox: fog.bbox,
-      width: fog.width,
-      height: fog.height,
-      days,
-    });
+    res.json(await getIslandSummary(islandId));
   } catch (err) {
     next(err);
   }
