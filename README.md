@@ -2,6 +2,10 @@
 
 An app that predicts fog across the 9 Azores islands for today and the next 3 days in a 50×50m color-coded map (no fog / yellow / orange / red).
 
+**Live demo:** https://afonsohj1812.github.io/BrumaWatch (rebuilt every 6 hours, so the forecast can be a few hours behind).
+
+![Fog forecast over São Miguel](docs/preview.png)
+
 ## How it works
 
 The forecast gives the height of the cloud base and the cloud top over each island. The elevation grid gives the height of the ground at every 50m cell. A cell is foggy when its elevation falls between the two, and the deeper it sits into the cloud, the lower the visibility.
@@ -62,18 +66,28 @@ a time as you scrub.
 
 ```
 backend/
-  api.js                  all routes
+  api.js                    all routes
+  shared/
+    fogMath.js              the model, pure and Node-free, shared with the browser
+    islands.js              the nine islands and their bounding boxes
   services/
-    forecast.js           Open-Meteo fetch + cache
-    fogModel.js           the physics
-    dem.js                loads the elevation grids
-    render.js             class grid -> PNG
-  scripts/prepare-dem.js  one-off DEM preparation
-  config/fogModel.json    every tunable constant
+    forecast.js             Open-Meteo fetch + cache
+    fogModel.js             wraps fogMath with the DEM, forecast and caching
+    dem.js                  loads the elevation grids
+    render.js               class grid -> PNG
+  scripts/
+    prepare-dem.js          one-off DEM preparation
+    export-static.js        writes the API as files for Pages
+  config/fogModel.json      every tunable constant
 frontend/
-  src/components/         map + the four control panels
-  src/composables/        data fetching and derived state
+  src/api.js                endpoint URLs, live or static
+  src/lib/dem.js            reads the .bin grids in the browser
+  src/components/           map + the four control panels
+  src/composables/          data fetching and derived state
 ```
+
+`fogMath.js` has no filesystem or network access on purpose: the frontend imports it directly
+(bind-mounted in development, copied in CI) so the fog model exists once, not twice.
 
 ## Data
 
