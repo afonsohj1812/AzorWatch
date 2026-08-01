@@ -8,6 +8,7 @@ const props = defineProps({
   overlayUrl: { type: String, default: null },
   prefetchUrls: { type: Array, default: () => [] },
   grid: { type: Object, default: null },
+  resetView: { type: Number, default: 0 },
 });
 const emit = defineEmits(["inspect"]);
 
@@ -27,6 +28,27 @@ function boundsOf(island) {
 function fitIsland() {
   if (!map || !props.island) return;
   map.fitBounds(boundsOf(props.island), { padding: [40, 40] });
+}
+
+const WHEEL_PX_PER_ZOOM = 60;
+let wheelDistance = 0;
+
+function zoomAroundIsland(levels) {
+  if (!map || !props.island) return;
+  const [lat, lon] = props.island.center;
+  map.setZoomAround(L.latLng(lat, lon), map.getZoom() + levels);
+}
+
+function onWheel(event) {
+  if (!map || !props.island) return;
+  event.preventDefault();
+
+  wheelDistance += event.deltaY;
+  const levels = Math.trunc(wheelDistance / WHEEL_PX_PER_ZOOM);
+  if (!levels) return;
+
+  wheelDistance -= levels * WHEEL_PX_PER_ZOOM;
+  zoomAroundIsland(-levels);
 }
 
 function showOverlay() {
@@ -115,6 +137,8 @@ onMounted(async () => {
   map = L.map(container.value, {
     attributionControl: false,
     zoomControl: false,
+    scrollWheelZoom: false,
+    doubleClickZoom: false,
   }).setView([38.5, -28.2], 8);
 
   L.tileLayer(
@@ -130,6 +154,9 @@ onMounted(async () => {
   map.on("mousemove", onMapMove);
   map.on("mouseout", clearCell);
   map.on("click", onMapMove);
+  map.on("dblclick", () => zoomAroundIsland(1));
+  container.value.addEventListener("wheel", onWheel, { passive: false });
+
   map.on("zoomend", () => {
     if (map.getZoom() < MIN_INSPECT_ZOOM) clearCell();
   });
@@ -141,6 +168,7 @@ onMounted(async () => {
 });
 
 onBeforeUnmount(() => {
+  container.value?.removeEventListener("wheel", onWheel);
   map?.remove();
   map = null;
   overlay = null;
@@ -155,6 +183,13 @@ watch(
   },
 );
 watch(() => props.overlayUrl, showOverlay);
+watch(
+  () => props.resetView,
+  () => {
+    clearCell();
+    fitIsland();
+  },
+);
 watch(
   () => props.prefetchUrls,
   (urls) => urls.forEach((url) => (new Image().src = url)),
@@ -171,6 +206,7 @@ watch(
 }
 
 .map {
+  background-color: rgb(17 32 47);
   height: 100%;
   position: relative;
   z-index: 0;

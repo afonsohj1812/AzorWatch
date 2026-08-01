@@ -3,7 +3,7 @@ defineProps({
   islands: { type: Array, default: () => [] },
   modelValue: { type: String, required: true },
 });
-defineEmits(["update:modelValue"]);
+defineEmits(["update:modelValue", "select"]);
 </script>
 
 <template>
@@ -14,7 +14,10 @@ defineEmits(["update:modelValue"]);
       class="island"
       :class="{ active: island.id === modelValue }"
       type="button"
-      @click="$emit('update:modelValue', island.id)"
+      @click="
+        $emit('update:modelValue', island.id);
+        $emit('select', island.id);
+      "
     >
       {{ island.name }}
     </button>

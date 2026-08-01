@@ -1,5 +1,5 @@
 <script setup>
-import { computed } from "vue";
+import { computed, ref } from "vue";
 
 import MapView from "./components/MapView.vue";
 import DayPicker from "./components/DayPicker.vue";
@@ -26,6 +26,8 @@ const {
   error,
 } = useForecast();
 
+const viewReset = ref(0);
+
 const currentHour = computed(() =>
   dayIndex.value === 0 ? nowHour.value : null,
 );
@@ -37,6 +39,7 @@ const currentHour = computed(() =>
       :island="island"
       :overlay-url="overlayUrl"
       :prefetch-urls="prefetchUrls"
+      :reset-view="viewReset"
       :grid="grid"
       @inspect="inspect"
     />
@@ -45,7 +48,11 @@ const currentHour = computed(() =>
       <DayPicker v-model="dayIndex" :days="days" />
     </div>
     <div class="panel panel--left">
-      <IslandPicker v-model="islandId" :islands="islands" />
+      <IslandPicker
+        v-model="islandId"
+        :islands="islands"
+        @select="viewReset++"
+      />
     </div>
     <div class="panel panel--right">
       <PointInfo :point="point" />
