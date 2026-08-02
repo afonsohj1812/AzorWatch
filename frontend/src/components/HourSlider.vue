@@ -164,6 +164,7 @@ function onPointerUp(event) {
   border: none;
   padding-top: 0.125rem;
   cursor: pointer;
+  touch-action: none;
 }
 
 .track:not(.dragging) .tick:hover {
