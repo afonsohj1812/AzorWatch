@@ -33,10 +33,16 @@ function fitIsland() {
 const WHEEL_PX_PER_ZOOM = 60;
 let wheelDistance = 0;
 
-function zoomAroundIsland(levels) {
+function zoomBy(levels, pointer) {
   if (!map || !props.island) return;
-  const [lat, lon] = props.island.center;
-  map.setZoomAround(L.latLng(lat, lon), map.getZoom() + levels);
+
+  const onIsland = boundsOf(props.island).contains(pointer);
+  const anchor =
+    levels < 0 || onIsland
+      ? pointer
+      : L.latLng(props.island.center[0], props.island.center[1]);
+
+  map.setZoomAround(anchor, map.getZoom() + levels);
 }
 
 function onWheel(event) {
@@ -44,11 +50,11 @@ function onWheel(event) {
   event.preventDefault();
 
   wheelDistance += event.deltaY;
-  const levels = Math.trunc(wheelDistance / WHEEL_PX_PER_ZOOM);
-  if (!levels) return;
+  const steps = Math.trunc(wheelDistance / WHEEL_PX_PER_ZOOM);
+  if (!steps) return;
 
-  wheelDistance -= levels * WHEEL_PX_PER_ZOOM;
-  zoomAroundIsland(-levels);
+  wheelDistance -= steps * WHEEL_PX_PER_ZOOM;
+  zoomBy(-steps, map.mouseEventToLatLng(event));
 }
 
 function showOverlay() {
@@ -154,7 +160,7 @@ onMounted(async () => {
   map.on("mousemove", onMapMove);
   map.on("mouseout", clearCell);
   map.on("click", onMapMove);
-  map.on("dblclick", () => zoomAroundIsland(1));
+  map.on("dblclick", (event) => zoomBy(1, event.latlng));
   container.value.addEventListener("wheel", onWheel, { passive: false });
 
   map.on("zoomend", () => {
