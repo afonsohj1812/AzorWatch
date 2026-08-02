@@ -33,6 +33,7 @@ defineEmits(["update:modelValue"]);
   display: flex;
   gap: 0.25rem;
   padding: 0.25rem;
+  width: clamp(15rem, calc(100vw - 1rem), 25rem);
 }
 
 .day {
@@ -40,7 +41,7 @@ defineEmits(["update:modelValue"]);
   flex-direction: column;
   align-items: center;
   gap: 0.5rem;
-  min-width: 5rem;
+  flex: 1;
   padding: 0.5rem;
   background: none;
   border: none;

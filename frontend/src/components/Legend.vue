@@ -1,9 +1,31 @@
 <script setup>
+import { ref } from "vue";
+
 import { FOG_CLASSES } from "../constants/fogClasses";
+
+defineProps({
+  collapsible: { type: Boolean, default: false },
+});
+
+const open = ref(false);
 </script>
 
 <template>
-  <div class="legend glass">
+  <button
+    v-if="collapsible && !open"
+    class="info glass"
+    type="button"
+    @click="open = true"
+  >
+    i
+  </button>
+
+  <div
+    v-else
+    class="legend glass"
+    :class="{ tappable: collapsible }"
+    @click="collapsible && (open = false)"
+  >
     <div class="title">VISIBILITY</div>
     <div v-for="fogClass in FOG_CLASSES" :key="fogClass.id" class="row">
       <span class="swatch" :style="{ background: fogClass.color }" />
@@ -37,5 +59,13 @@ import { FOG_CLASSES } from "../constants/fogClasses";
   height: 1rem;
   border: solid 1px rgb(255 255 255 / 0.5);
   border-radius: 4px;
+}
+
+.info {
+  font-size: 1.125rem;
+  font-weight: bold;
+  border-radius: 50%;
+  width: 2.5rem;
+  height: 2.5rem;
 }
 </style>

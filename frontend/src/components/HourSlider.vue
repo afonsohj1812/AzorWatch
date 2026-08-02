@@ -166,6 +166,11 @@ function onPointerUp(event) {
   cursor: pointer;
 }
 
+.track:not(.dragging) .tick:hover {
+  transform: scaleY(1.25);
+  filter: brightness(1.25);
+}
+
 .tick {
   flex: 1;
   height: 1rem;
@@ -194,10 +199,5 @@ function onPointerUp(event) {
   100% {
     box-shadow: 0 0 0 0 rgb(63 223 127 / 0);
   }
-}
-
-.track:not(.dragging) .tick:hover {
-  transform: scaleY(1.25);
-  filter: brightness(1.25);
 }
 </style>

@@ -8,6 +8,7 @@ import HourSlider from "./components/HourSlider.vue";
 import Legend from "./components/Legend.vue";
 import PointInfo from "./components/PointInfo.vue";
 import { useForecast } from "./composables/useForecast";
+import { useMobile } from "./composables/useMobile";
 
 const {
   islands,
@@ -27,6 +28,7 @@ const {
 } = useForecast();
 
 const viewReset = ref(0);
+const isMobile = useMobile();
 
 const currentHour = computed(() =>
   dayIndex.value === 0 ? nowHour.value : null,
@@ -51,6 +53,7 @@ const currentHour = computed(() =>
       <IslandPicker
         v-model="islandId"
         :islands="islands"
+        :collapsible="isMobile"
         @select="viewReset++"
       />
     </div>
@@ -65,7 +68,7 @@ const currentHour = computed(() =>
       />
     </div>
     <div class="panel panel--bottom-right">
-      <Legend />
+      <Legend :collapsible="isMobile" />
     </div>
 
     <p class="panel credits">
@@ -122,5 +125,39 @@ const currentHour = computed(() =>
   font-size: 0.75rem;
   color: rgb(127, 127, 127);
   pointer-events: none;
+}
+
+@media (max-width: 1024px) {
+  .panel--bottom {
+    bottom: 2rem;
+    left: 0.5rem;
+    right: 0.5rem;
+    transform: none;
+    width: auto;
+  }
+
+  .panel--bottom-right {
+    bottom: 6rem;
+    right: 0.5rem;
+  }
+}
+
+@media (max-width: 768px) {
+  .panel--top {
+    top: 0.5rem;
+  }
+
+  .panel--left {
+    top: auto;
+    bottom: 6rem;
+    left: 0.5rem;
+    transform: none;
+  }
+
+  .panel--right {
+    top: 6rem;
+    right: 0.5rem;
+    transform: none;
+  }
 }
 </style>
