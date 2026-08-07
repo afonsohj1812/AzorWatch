@@ -45,15 +45,8 @@ const WHEEL_PX_PER_ZOOM = 60;
 let wheelDistance = 0;
 
 function zoomBy(levels, pointer) {
-  if (!map || !props.island) return;
-
-  const onIsland = boundsOf(props.island).contains(pointer);
-  const anchor =
-    levels < 0 || onIsland
-      ? pointer
-      : L.latLng(props.island.center[0], props.island.center[1]);
-
-  map.setZoomAround(anchor, map.getZoom() + levels);
+  if (!map) return;
+  map.setZoomAround(pointer, map.getZoom() + levels);
 }
 
 function onWheel(event) {
@@ -89,21 +82,12 @@ function showOverlay() {
   image.src = url;
 }
 
-const ISLAND_REST = {
-  stroke: false,
-  fill: true,
-  fillColor: "#fff",
-  fillOpacity: 0,
-};
-
-const ISLAND_HOVER = {
-  stroke: true,
-  color: "#fff",
-  weight: 1.5,
-  fill: true,
-  fillColor: "#fff",
-  fillOpacity: 0.2,
-};
+const islandIcon = L.divIcon({
+  className: "island-pick",
+  html: "<span></span>",
+  iconSize: [64, 64],
+  iconAnchor: [32, 32],
+});
 
 function showIslands() {
   if (!map) return;
@@ -116,21 +100,22 @@ function showIslands() {
 
   islandLayer = L.layerGroup(
     others.map((each) => {
-      const rect = L.rectangle(boundsOf(each), ISLAND_REST);
+      const marker = L.marker(each.center, {
+        icon: islandIcon,
+        keyboard: false,
+      });
 
-      rect.bindTooltip(each.name, {
+      marker.bindTooltip(each.name, {
         direction: "top",
-        sticky: true,
+        offset: [0, -24],
         className: "island-tip",
       });
-      rect.on("mouseover", () => rect.setStyle(ISLAND_HOVER));
-      rect.on("mouseout", () => rect.setStyle(ISLAND_REST));
-      rect.on("click", (event) => {
+      marker.on("click", (event) => {
         L.DomEvent.stopPropagation(event);
         emit("select", each.id);
       });
 
-      return rect;
+      return marker;
     }),
   ).addTo(map);
 }
@@ -269,6 +254,29 @@ watch(
 <style scoped>
 .map :deep(.fog-overlay) {
   image-rendering: pixelated;
+}
+
+.map :deep(.island-pick) {
+  display: grid;
+  place-items: center;
+  background: none;
+  border: none;
+}
+
+.map :deep(.island-pick span) {
+  width: 12px;
+  height: 12px;
+  border-radius: 50%;
+  background: rgba(255, 255, 255, 0.5);
+  border: 1.5px solid rgba(15, 26, 38, 0.75);
+  transition:
+    transform 0.1s ease,
+    background 0.1s ease;
+}
+
+.map :deep(.island-pick:hover span) {
+  transform: scale(1.75);
+  background: rgba(255, 255, 255, 0.9);
 }
 
 .map :deep(.island-tip) {
