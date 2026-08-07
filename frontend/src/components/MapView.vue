@@ -5,12 +5,13 @@ import "leaflet/dist/leaflet.css";
 
 const props = defineProps({
   island: { type: Object, default: null },
+  islands: { type: Array, default: () => [] },
   overlayUrl: { type: String, default: null },
   prefetchUrls: { type: Array, default: () => [] },
   grid: { type: Object, default: null },
   resetView: { type: Number, default: 0 },
 });
-const emit = defineEmits(["inspect"]);
+const emit = defineEmits(["inspect", "select"]);
 
 const MIN_INSPECT_ZOOM = 14;
 
@@ -19,6 +20,7 @@ let map = null;
 let overlay = null;
 let cellOutline = null;
 let hovered = null;
+let islandLayer = null;
 
 function boundsOf(island) {
   const [west, south, east, north] = island.bbox;
@@ -85,6 +87,52 @@ function showOverlay() {
     }
   };
   image.src = url;
+}
+
+const ISLAND_REST = {
+  stroke: false,
+  fill: true,
+  fillColor: "#fff",
+  fillOpacity: 0,
+};
+
+const ISLAND_HOVER = {
+  stroke: true,
+  color: "#fff",
+  weight: 1.5,
+  fill: true,
+  fillColor: "#fff",
+  fillOpacity: 0.2,
+};
+
+function showIslands() {
+  if (!map) return;
+
+  islandLayer?.remove();
+  islandLayer = null;
+
+  const others = props.islands.filter((each) => each.id !== props.island?.id);
+  if (!others.length) return;
+
+  islandLayer = L.layerGroup(
+    others.map((each) => {
+      const rect = L.rectangle(boundsOf(each), ISLAND_REST);
+
+      rect.bindTooltip(each.name, {
+        direction: "top",
+        sticky: true,
+        className: "island-tip",
+      });
+      rect.on("mouseover", () => rect.setStyle(ISLAND_HOVER));
+      rect.on("mouseout", () => rect.setStyle(ISLAND_REST));
+      rect.on("click", (event) => {
+        L.DomEvent.stopPropagation(event);
+        emit("select", each.id);
+      });
+
+      return rect;
+    }),
+  ).addTo(map);
 }
 
 function cellAt(latlng) {
@@ -180,6 +228,7 @@ onMounted(async () => {
   map.invalidateSize();
   fitIsland();
   showOverlay();
+  showIslands();
 });
 
 onBeforeUnmount(() => {
@@ -188,6 +237,7 @@ onBeforeUnmount(() => {
   map = null;
   overlay = null;
   cellOutline = null;
+  islandLayer = null;
 });
 
 watch(
@@ -198,6 +248,7 @@ watch(
   },
 );
 watch(() => props.overlayUrl, showOverlay);
+watch(() => [props.islands, props.island], showIslands);
 watch(
   () => props.resetView,
   () => {
@@ -218,6 +269,21 @@ watch(
 <style scoped>
 .map :deep(.fog-overlay) {
   image-rendering: pixelated;
+}
+
+.map :deep(.island-tip) {
+  padding: 0.25rem 0.5rem;
+  background: rgba(159, 207, 255, 0.2);
+  backdrop-filter: blur(16px) saturate(100%);
+  border: 1px solid rgba(159, 207, 255, 0.25);
+  border-radius: 0.5rem;
+  box-shadow: 0 4px 32px rgba(0, 0, 0, 0.1);
+  color: rgb(223, 223, 223);
+  font-size: 0.75rem;
+}
+
+.map :deep(.island-tip::before) {
+  display: none;
 }
 
 .map {
