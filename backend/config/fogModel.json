@@ -2,11 +2,11 @@
   "cellSize": 50,
 
   "cloudBase": {
-    "saturationRh": 99,
+    "saturationRh": 90,
     "lclCoefficient": 125
   },
   "cloudTop": {
-    "exitRh": 95,
+    "exitRh": 85,
     "maxThickness": 1500
   },
   "windward": {
@@ -27,7 +27,7 @@
   },
 
   "mist": {
-    "belowBaseBand": 150,
+    "belowBaseBand": 125,
     "saturationRh": 97
   },
   "lapseRate": {
@@ -36,6 +36,10 @@
   },
 
   "classThresholds": { "yellow": 10000, "orange": 1000, "red": 100 },
+  "summary": {
+    "minCoverage": 0.05,
+    "minDuration": 0.5
+  },
   "colors": {
     "yellow": [255, 255, 63, 127],
     "orange": [255, 127, 63, 127],

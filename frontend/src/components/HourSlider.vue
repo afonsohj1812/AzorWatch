@@ -102,7 +102,7 @@ function onPointerUp(event) {
         :aria-valuemin="0"
         :aria-valuemax="Math.max(0, count - 1)"
         :aria-valuenow="modelValue"
-        :aria-valuetext="`${label}, ${hours[modelValue]?.maxClass ?? 'no data'}`"
+        :aria-valuetext="`${label}, ${hours[modelValue]?.fogClass ?? 'no data'}`"
         @pointerdown="onPointerDown"
         @pointermove="onPointerMove"
         @pointerup="onPointerUp"
@@ -114,7 +114,7 @@ function onPointerUp(event) {
           :key="entry.time"
           class="tick"
           :class="{ active: i === modelValue, now: i === currentHour }"
-          :style="{ background: colorOf(entry.maxClass) }"
+          :style="{ background: colorOf(entry.fogClass) }"
         />
       </div>
     </div>

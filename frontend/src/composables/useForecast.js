@@ -12,7 +12,7 @@ import {
 import { fetchDem } from "../lib/dem";
 import { createFogMath, FOG_CLASS_NAMES, OCEAN } from "../shared/fogMath";
 
-const DEFAULT_ISLAND = "sao-miguel";
+const DEFAULT_ISLAND = "terceira";
 
 const azoresHour = () =>
   Number(

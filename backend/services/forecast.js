@@ -23,6 +23,7 @@ function url() {
   const params = new URLSearchParams({
     latitude: islands.map((i) => i.center[0]).join(","),
     longitude: islands.map((i) => i.center[1]).join(","),
+    elevation: islands.map(() => "0").join(","),
     hourly: [
       ...SURFACE,
       ...LEVELS.flatMap((p) => [

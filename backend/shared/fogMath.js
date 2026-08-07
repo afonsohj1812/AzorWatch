@@ -71,7 +71,7 @@ export function createFogMath(config) {
   function visibilityInYellow(z, base, c) {
     const { yellow, orange } = config.classThresholds;
 
-    const bottom = Math.min(base - config.mist.belowBaseBand, c.mist);
+    const bottom = base - config.mist.belowBaseBand;
     const top = base + c.orangeDepth;
     if (!(top > bottom)) return orange;
 
@@ -127,10 +127,7 @@ export function createFogMath(config) {
     const saturated = saturationHeight(profile);
     const lcl = lclHeight(temperature, dewPoint, elevation);
 
-    const base = Math.max(
-      0,
-      saturated === null ? lcl : Math.min(saturated, lcl),
-    );
+    const base = Math.max(0, saturated === null ? lcl : saturated);
 
     return {
       base,
@@ -179,8 +176,7 @@ export function createFogMath(config) {
           ? FOG_CLASS.ORANGE
           : FOG_CLASS.YELLOW;
     }
-    if (-depth <= config.mist.belowBaseBand || z >= c.mist)
-      return FOG_CLASS.YELLOW;
+    if (-depth <= config.mist.belowBaseBand) return FOG_CLASS.YELLOW;
     return FOG_CLASS.NONE;
   }
 

@@ -18,7 +18,7 @@ defineEmits(["update:modelValue"]);
       type="button"
       @click="$emit('update:modelValue', i)"
     >
-      <span class="dot" :style="{ background: colorOf(day.maxClass) }" />
+      <span class="dot" :style="{ background: colorOf(day.fogClass) }" />
       <span class="name">
         <span v-if="i === 0" class="live" />
         {{ i === 0 ? "Today" : day.weekday }}

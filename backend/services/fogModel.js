@@ -39,27 +39,50 @@ export async function getIslandFog(id) {
   const dem = await loadDem(id);
   const hours = forecast.time.length;
 
+  let landCells = 0;
+  for (let i = 0; i < dem.elevation.length; i++)
+    if (dem.elevation[i] !== OCEAN) landCells++;
+
+  const minCells = config.summary.minCoverage * landCells;
+  const minHours = Math.ceil(config.summary.minDuration * HOURS_PER_DAY);
+
   const grids = [];
-  const hourMax = new Uint8Array(hours);
+  const hourClass = new Uint8Array(hours);
 
   for (let hour = 0; hour < hours; hour++) {
     const classes = classifyHour(dem, forecast, hour);
     grids.push(classes);
 
-    let max = 0;
+    const counts = [0, 0, 0, 0];
     for (let i = 0; i < classes.length; i++)
-      if (classes[i] > max) max = classes[i];
-    hourMax[hour] = max;
+      if (dem.elevation[i] !== OCEAN) counts[classes[i]]++;
+
+    let atOrWorse = 0;
+    for (let q = FOG_CLASS.RED; q >= FOG_CLASS.YELLOW; q--) {
+      atOrWorse += counts[q];
+      if (atOrWorse >= minCells) {
+        hourClass[hour] = q;
+        break;
+      }
+    }
   }
 
   const days = hours / HOURS_PER_DAY;
-  const dayMax = new Uint8Array(days);
+  const dayClass = new Uint8Array(days);
+
   for (let day = 0; day < days; day++) {
-    let max = 0;
-    for (let h = day * HOURS_PER_DAY; h < (day + 1) * HOURS_PER_DAY; h++) {
-      if (hourMax[h] > max) max = hourMax[h];
+    const start = day * HOURS_PER_DAY;
+
+    for (let q = FOG_CLASS.RED; q >= FOG_CLASS.YELLOW; q--) {
+      let matching = 0;
+      for (let h = start; h < start + HOURS_PER_DAY; h++)
+        if (hourClass[h] >= q) matching++;
+
+      if (matching >= minHours) {
+        dayClass[day] = q;
+        break;
+      }
     }
-    dayMax[day] = max;
   }
 
   const bundle = {
@@ -70,8 +93,8 @@ export async function getIslandFog(id) {
     height: dem.height,
     bbox: dem.bbox,
     grids,
-    hourMax,
-    dayMax,
+    hourClass,
+    dayClass,
   };
   bundles.set(id, bundle);
   return bundle;
@@ -98,7 +121,7 @@ export async function getIslandSummary(id) {
   const fog = await getIslandFog(id);
   const days = [];
 
-  for (let day = 0; day < fog.dayMax.length; day++) {
+  for (let day = 0; day < fog.dayClass.length; day++) {
     const start = day * HOURS_PER_DAY;
     const date = fog.time[start].slice(0, 10);
 
@@ -106,10 +129,10 @@ export async function getIslandSummary(id) {
       date,
       label: dayLabel(date),
       weekday: weekday(date),
-      maxClass: FOG_CLASS_NAMES[fog.dayMax[day]],
+      fogClass: FOG_CLASS_NAMES[fog.dayClass[day]],
       hours: Array.from({ length: HOURS_PER_DAY }, (_, h) => ({
         time: fog.time[start + h],
-        maxClass: FOG_CLASS_NAMES[fog.hourMax[start + h]],
+        fogClass: FOG_CLASS_NAMES[fog.hourClass[start + h]],
       })),
     });
   }
