@@ -25,9 +25,18 @@ function boundsOf(island) {
   return L.latLngBounds([south, west], [north, east]);
 }
 
-function fitIsland() {
+const FLY_DURATION = 1.25;
+const reduceMotion = matchMedia("(prefers-reduced-motion: reduce)").matches;
+
+function fitIsland(animate = false) {
   if (!map || !props.island) return;
-  map.fitBounds(boundsOf(props.island), { padding: [40, 40] });
+
+  const bounds = boundsOf(props.island);
+  const padding = [40, 40];
+
+  if (animate && !reduceMotion)
+    map.flyToBounds(bounds, { padding, duration: FLY_DURATION });
+  else map.fitBounds(bounds, { padding });
 }
 
 const WHEEL_PX_PER_ZOOM = 60;
@@ -185,7 +194,7 @@ watch(
   () => props.island,
   () => {
     clearCell();
-    fitIsland();
+    fitIsland(true);
   },
 );
 watch(() => props.overlayUrl, showOverlay);
@@ -193,7 +202,7 @@ watch(
   () => props.resetView,
   () => {
     clearCell();
-    fitIsland();
+    fitIsland(true);
   },
 );
 watch(
