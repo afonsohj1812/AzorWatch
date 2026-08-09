@@ -5,13 +5,12 @@ import "leaflet/dist/leaflet.css";
 
 const props = defineProps({
   island: { type: Object, default: null },
-  islands: { type: Array, default: () => [] },
   overlayUrl: { type: String, default: null },
   prefetchUrls: { type: Array, default: () => [] },
   grid: { type: Object, default: null },
   resetView: { type: Number, default: 0 },
 });
-const emit = defineEmits(["inspect", "select"]);
+const emit = defineEmits(["inspect"]);
 
 const MIN_INSPECT_ZOOM = 14;
 
@@ -20,7 +19,6 @@ let map = null;
 let overlay = null;
 let cellOutline = null;
 let hovered = null;
-let islandLayer = null;
 
 function boundsOf(island) {
   const [west, south, east, north] = island.bbox;
@@ -80,44 +78,6 @@ function showOverlay() {
     }
   };
   image.src = url;
-}
-
-const islandIcon = L.divIcon({
-  className: "island-pick",
-  html: "<span></span>",
-  iconSize: [64, 64],
-  iconAnchor: [32, 32],
-});
-
-function showIslands() {
-  if (!map) return;
-
-  islandLayer?.remove();
-  islandLayer = null;
-
-  const others = props.islands.filter((each) => each.id !== props.island?.id);
-  if (!others.length) return;
-
-  islandLayer = L.layerGroup(
-    others.map((each) => {
-      const marker = L.marker(each.center, {
-        icon: islandIcon,
-        keyboard: false,
-      });
-
-      marker.bindTooltip(each.name, {
-        direction: "top",
-        offset: [0, -24],
-        className: "island-tip",
-      });
-      marker.on("click", (event) => {
-        L.DomEvent.stopPropagation(event);
-        emit("select", each.id);
-      });
-
-      return marker;
-    }),
-  ).addTo(map);
 }
 
 function cellAt(latlng) {
@@ -213,7 +173,6 @@ onMounted(async () => {
   map.invalidateSize();
   fitIsland();
   showOverlay();
-  showIslands();
 });
 
 onBeforeUnmount(() => {
@@ -222,7 +181,6 @@ onBeforeUnmount(() => {
   map = null;
   overlay = null;
   cellOutline = null;
-  islandLayer = null;
 });
 
 watch(
@@ -233,7 +191,6 @@ watch(
   },
 );
 watch(() => props.overlayUrl, showOverlay);
-watch(() => [props.islands, props.island], showIslands);
 watch(
   () => props.resetView,
   () => {
@@ -254,44 +211,6 @@ watch(
 <style scoped>
 .map :deep(.fog-overlay) {
   image-rendering: pixelated;
-}
-
-.map :deep(.island-pick) {
-  display: grid;
-  place-items: center;
-  background: none;
-  border: none;
-}
-
-.map :deep(.island-pick span) {
-  width: 12px;
-  height: 12px;
-  border-radius: 50%;
-  background: rgba(255, 255, 255, 0.5);
-  border: 1.5px solid rgba(15, 26, 38, 0.75);
-  transition:
-    transform 0.1s ease,
-    background 0.1s ease;
-}
-
-.map :deep(.island-pick:hover span) {
-  transform: scale(1.75);
-  background: rgba(255, 255, 255, 0.9);
-}
-
-.map :deep(.island-tip) {
-  padding: 0.25rem 0.5rem;
-  background: rgba(159, 207, 255, 0.2);
-  backdrop-filter: blur(16px) saturate(100%);
-  border: 1px solid rgba(159, 207, 255, 0.25);
-  border-radius: 0.5rem;
-  box-shadow: 0 4px 32px rgba(0, 0, 0, 0.1);
-  color: rgb(223, 223, 223);
-  font-size: 0.75rem;
-}
-
-.map :deep(.island-tip::before) {
-  display: none;
 }
 
 .map {

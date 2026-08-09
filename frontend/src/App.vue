@@ -39,13 +39,11 @@ const currentHour = computed(() =>
   <div class="app">
     <MapView
       :island="island"
-      :islands="islands"
       :overlay-url="overlayUrl"
       :prefetch-urls="prefetchUrls"
       :reset-view="viewReset"
       :grid="grid"
       @inspect="inspect"
-      @select="islandId = $event"
     />
 
     <div class="panel panel--top">
