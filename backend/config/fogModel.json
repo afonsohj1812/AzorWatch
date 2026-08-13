@@ -27,12 +27,7 @@
   },
 
   "mist": {
-    "belowBaseBand": 125,
-    "saturationRh": 97
-  },
-  "lapseRate": {
-    "temperature": 9.8,
-    "dewPoint": 1.8
+    "belowBaseBand": 125
   },
 
   "classThresholds": { "yellow": 10000, "orange": 1000, "red": 100 },

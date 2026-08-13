@@ -10,10 +10,6 @@ import { renderOverlay } from "./services/render.js";
 
 const api = Router();
 
-api.get("/health", (req, res) => {
-  res.json({ ok: true, islands: islands.length });
-});
-
 api.get("/islands", (req, res) => {
   res.json(islands);
 });
@@ -46,8 +42,6 @@ api.get("/fog/:islandId/:hour.png", async (req, res, next) => {
       "Content-Type": "image/png",
       ETag: overlay.etag,
       "Cache-Control": "public, max-age=1800",
-      "X-Fog-Bbox": overlay.bbox.join(","),
-      "X-Fog-Time": overlay.time,
     });
 
     if (req.headers["if-none-match"] === overlay.etag)

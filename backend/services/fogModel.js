@@ -15,14 +15,7 @@ const config = JSON.parse(
 
 const math = createFogMath(config);
 
-export const {
-  hourConditions,
-  localBase,
-  classifyCell,
-  classifyHour,
-  visibilityAt,
-} = math;
-export { FOG_CLASS, FOG_CLASS_NAMES };
+const { hourConditions, localBase, classifyHour, visibilityAt } = math;
 
 const HOURS_PER_DAY = 24;
 
@@ -86,12 +79,10 @@ export async function getIslandFog(id) {
   }
 
   const bundle = {
-    id,
     runAt,
     time: forecast.time,
     width: dem.width,
     height: dem.height,
-    bbox: dem.bbox,
     grids,
     hourClass,
     dayClass,
@@ -140,7 +131,6 @@ export async function getIslandSummary(id) {
   return {
     island: id,
     runAt: fog.runAt,
-    bbox: fog.bbox,
     width: fog.width,
     height: fog.height,
     days,
@@ -149,7 +139,6 @@ export async function getIslandSummary(id) {
       return {
         base: c.base,
         top: c.top,
-        mist: Number.isFinite(c.mist) ? c.mist : null,
         orangeDepth: c.orangeDepth,
         redDepth: c.redDepth,
         windDirection: c.windDirection,

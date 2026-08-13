@@ -38,10 +38,6 @@ export async function renderOverlay(id, hour) {
 
   const result = {
     buffer: PNG.sync.write(png),
-    bbox: fog.bbox,
-    width: fog.width,
-    height: fog.height,
-    time: fog.time[hour],
     etag: `"${fog.runAt}:${id}:${hour}"`,
   };
 

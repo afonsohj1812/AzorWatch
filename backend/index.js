@@ -6,7 +6,7 @@ import api from "./api.js";
 const app = express();
 const port = Number(process.env.PORT ?? 3000);
 
-app.use(cors({ exposedHeaders: ["X-Fog-Bbox", "X-Fog-Time"] }));
+app.use(cors());
 app.use("/api", api);
 
 app.use((err, req, res, next) => {

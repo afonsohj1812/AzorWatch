@@ -106,9 +106,8 @@ export function useForecast() {
     const base = { time: hour.value.time, x, y };
     if (z === OCEAN) return { ...base, sea: true, class: "none" };
 
-    const raw =
+    const c =
       forecast.value.conditions[dayIndex.value * 24 + hourIndex.value];
-    const c = { ...raw, mist: raw.mist ?? Infinity };
 
     const cloudBase = math.localBase(dem.aspect[index], dem.slope[index], c);
     const fogClass = math.classifyCell(z, cloudBase, c);

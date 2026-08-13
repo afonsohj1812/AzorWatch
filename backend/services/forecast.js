@@ -4,10 +4,7 @@ const API = "https://api.open-meteo.com/v1/forecast";
 
 const SURFACE = [
   "temperature_2m",
-  "relative_humidity_2m",
   "dew_point_2m",
-  "cloud_cover_low",
-  "visibility",
   "wind_speed_10m",
   "wind_direction_10m",
 ];

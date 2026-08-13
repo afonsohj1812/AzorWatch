@@ -4,9 +4,6 @@ export const FOG_CLASS_NAMES = ["none", "yellow", "orange", "red"];
 
 export const OCEAN = -32768;
 
-const es = (t) => 6.112 * Math.exp((17.67 * t) / (t + 243.5));
-const rhFrom = (t, td) => 100 * (es(td) / es(t));
-
 const radians = (degrees) => (degrees * Math.PI) / 180;
 
 export function createFogMath(config) {
@@ -85,27 +82,6 @@ export function createFogMath(config) {
     return visibilityForDepth(z - base);
   }
 
-  function mistHeight(temperature, dewPoint, modelElevation) {
-    const target = config.mist.saturationRh;
-    const dT = config.lapseRate.temperature / 1000;
-    const dTd = config.lapseRate.dewPoint / 1000;
-
-    let low = modelElevation;
-    let high = modelElevation + 3000;
-    if (rhFrom(temperature, dewPoint) >= target) return low;
-    if (rhFrom(temperature - dT * 3000, dewPoint - dTd * 3000) < target)
-      return Infinity;
-
-    for (let i = 0; i < 24; i++) {
-      const mid = (low + high) / 2;
-      const d = mid - modelElevation;
-      if (rhFrom(temperature - dT * d, dewPoint - dTd * d) >= target)
-        high = mid;
-      else low = mid;
-    }
-    return high;
-  }
-
   function hourlyProfile(forecast, hour) {
     return forecast.levels
       .map((level) => ({
@@ -132,7 +108,6 @@ export function createFogMath(config) {
     return {
       base,
       top: cloudTopHeight(profile, base),
-      mist: mistHeight(temperature, dewPoint, elevation),
       orangeDepth: depthForVisibility(config.classThresholds.orange),
       redDepth: depthForVisibility(config.classThresholds.red),
       windDirection: surface.wind_direction_10m[hour],
