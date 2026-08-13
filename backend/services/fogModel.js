@@ -36,8 +36,7 @@ export async function getIslandFog(id) {
   for (let i = 0; i < dem.elevation.length; i++)
     if (dem.elevation[i] !== OCEAN) landCells++;
 
-  const minCells = config.summary.minCoverage * landCells;
-  const minHours = Math.ceil(config.summary.minDuration * HOURS_PER_DAY);
+  const coverage = config.summary.coverage;
 
   const grids = [];
   const hourClass = new Uint8Array(hours);
@@ -46,18 +45,19 @@ export async function getIslandFog(id) {
     const classes = classifyHour(dem, forecast, hour);
     grids.push(classes);
 
-    const counts = [0, 0, 0, 0];
+    let fogged = 0;
     for (let i = 0; i < classes.length; i++)
-      if (dem.elevation[i] !== OCEAN) counts[classes[i]]++;
+      if (dem.elevation[i] !== OCEAN && classes[i] !== FOG_CLASS.NONE) fogged++;
 
-    let atOrWorse = 0;
-    for (let q = FOG_CLASS.RED; q >= FOG_CLASS.YELLOW; q--) {
-      atOrWorse += counts[q];
-      if (atOrWorse >= minCells) {
-        hourClass[hour] = q;
-        break;
-      }
-    }
+    const covered = fogged / landCells;
+    hourClass[hour] =
+      covered >= coverage.red
+        ? FOG_CLASS.RED
+        : covered >= coverage.orange
+          ? FOG_CLASS.ORANGE
+          : covered >= coverage.yellow
+            ? FOG_CLASS.YELLOW
+            : FOG_CLASS.NONE;
   }
 
   const days = hours / HOURS_PER_DAY;
@@ -66,16 +66,10 @@ export async function getIslandFog(id) {
   for (let day = 0; day < days; day++) {
     const start = day * HOURS_PER_DAY;
 
-    for (let q = FOG_CLASS.RED; q >= FOG_CLASS.YELLOW; q--) {
-      let matching = 0;
-      for (let h = start; h < start + HOURS_PER_DAY; h++)
-        if (hourClass[h] >= q) matching++;
+    let total = 0;
+    for (let h = start; h < start + HOURS_PER_DAY; h++) total += hourClass[h];
 
-      if (matching >= minHours) {
-        dayClass[day] = q;
-        break;
-      }
-    }
+    dayClass[day] = Math.floor(total / HOURS_PER_DAY);
   }
 
   const bundle = {

@@ -32,8 +32,7 @@
 
   "classThresholds": { "yellow": 10000, "orange": 1000, "red": 100 },
   "summary": {
-    "minCoverage": 0.05,
-    "minDuration": 0.5
+    "coverage": { "yellow": 0.25, "orange": 0.5, "red": 0.75 }
   },
   "colors": {
     "yellow": [255, 255, 63, 127],
