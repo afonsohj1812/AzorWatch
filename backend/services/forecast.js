@@ -1,6 +1,15 @@
+import { readFileSync } from "node:fs";
+
 import { islands } from "../shared/islands.js";
 
 const API = "https://api.open-meteo.com/v1/forecast";
+
+const { forecastDays } = JSON.parse(
+  readFileSync(new URL("../config/fogModel.json", import.meta.url)),
+);
+
+const HOURS_PER_DAY = 24;
+const EXPECTED_HOURS = forecastDays * HOURS_PER_DAY;
 
 const SURFACE = [
   "temperature_2m",
@@ -29,7 +38,7 @@ function url() {
         `geopotential_height_${p}hPa`,
       ]),
     ].join(","),
-    forecast_days: "4",
+    forecast_days: String(forecastDays),
     timezone: "auto",
   });
   return `${API}?${params}`;
@@ -65,9 +74,9 @@ async function fetchAll() {
   const byIsland = {};
   islands.forEach((island, i) => {
     const entry = body[i];
-    if (entry.hourly?.time?.length !== 96) {
+    if (entry.hourly?.time?.length !== EXPECTED_HOURS) {
       throw new Error(
-        `${island.id}: expected 96 hours, got ${entry.hourly?.time?.length}`,
+        `${island.id}: expected ${EXPECTED_HOURS} hours, got ${entry.hourly?.time?.length}`,
       );
     }
     byIsland[island.id] = shape(entry, island);

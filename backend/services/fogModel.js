@@ -89,7 +89,7 @@ const asUtc = (date) => new Date(`${date}T00:00:00Z`);
 const dayLabel = (date) =>
   asUtc(date).toLocaleDateString("en-GB", {
     day: "numeric",
-    month: "long",
+    month: "short",
     timeZone: "UTC",
   });
 const weekday = (date) =>

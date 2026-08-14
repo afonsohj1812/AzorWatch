@@ -1,5 +1,6 @@
 {
   "cellSize": 50,
+  "forecastDays": 7,
 
   "cloudBase": {
     "saturationRh": 90,
