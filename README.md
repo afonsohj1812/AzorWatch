@@ -32,35 +32,35 @@ bucketed into four classes:
 | yellow | 1km – 10km |
 | none   | > 10 km    |
 
+Those colors describe a single 50m pixel. The hour ticks and day circles use the same colors
+for a different thing, how much of the island is affected: an hour is yellow past 25% of the
+land fogged, orange past 50% and red past 75%, and a day averages its 24 hours (red 3, orange
+2, yellow 1, none 0) and takes the whole part.
+
 ## Running it
 
 Everything runs in Docker.
 
 ```sh
-# Run only once: download the DEM tiles and build the 50 m grids (a few minutes, ~20 MB)
-docker compose run --rm backend node scripts/prepare-dem.js
-
 docker compose up
 ```
 
 Frontend on `localhost:5173`, backend on `localhost:3000`.
 
-The DEM script ends with assertions against known summit heights and the archipelago's total
-land area, and exits non-zero if they drift. A wrong decode still produces plausible-looking
-elevations, so this is the only thing that catches it.
-
 ## API
 
-| endpoint                             | returns                                           |
-| ------------------------------------ | ------------------------------------------------- |
-| `GET /api/islands`                   | island list with bounding boxes                   |
-| `GET /api/forecast/:island`          | 4 days × 24 hours of worst-class per hour (~5 KB) |
-| `GET /api/fog/:island/:hour.png`     | the overlay for one hour (1–30 KB)                |
-| `GET /api/point/:island/:hour?x=&y=` | one cell: elevation, cloud base/top, visibility   |
+| endpoint                             | returns                                              |
+| ------------------------------------ | ---------------------------------------------------- |
+| `GET /api/islands`                   | island list with bounding boxes                      |
+| `GET /api/forecast/:island`          | 4 days × 24 hours of class, plus conditions (~17 KB) |
+| `GET /api/fog/:island/:hour.png`     | the overlay for one hour (1–30 KB)                   |
+| `GET /api/point/:island/:hour?x=&y=` | one cell: elevation, cloud base/top, visibility      |
 
-The forecast summary and the pixels are separate on purpose. The summary is tiny and fetched
+The forecast summary and the pixels are separate on purpose. The summary is small and fetched
 once per island to color the day and hour controls, while the pixels are paged in one hour at
-a time as you scrub.
+a time as you scrub. Its `conditions` array also carries the cloud base, top and the depth
+thresholds, which is what lets the static build classify a single cell in the browser with no
+server behind it.
 
 ## Layout
 
@@ -97,12 +97,13 @@ frontend/
 
 ## Limitations
 
+- **It predicts the height range a cloud would occupy, not whether there is a cloud.** The
+  profile always yields a base and a top, and every land cell between them is painted as fog.
+  Nothing in the pipeline ever establishes that cloud actually exists over that island at that
+  hour. On a humid but cloudless day the numbers still produce a base a few hundred meters up,
+  so the high ground is shown as fogged under a clear sky, and the app has no way to tell that
+  case apart from a real deck. This is the single largest source of false fog.
 - **The model is not validated.** Every constant in `config/fogModel.json` is either standard
   physics or a plausible value chosen by hand and checked against a single day of output.
   Nothing has been compared against observed fog. It is a physically reasoned estimate, not a
   verified forecast.
-- The mist rules and the whole windward block are the least grounded parts.
-- Fog over water is not modelled, only land cells are classified.
-- Deck thickness can jump between adjacent hours when humidity crosses a threshold.
-- The overlay is drawn stretched in Web Mercator from a grid built in latitude, so cells sit
-  up to ~12 m from their true position, well under one cell.

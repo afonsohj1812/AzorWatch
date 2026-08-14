@@ -2,18 +2,20 @@ import { Router } from "express";
 
 import { islands, getIsland } from "./shared/islands.js";
 import {
-  getIslandFog,
   getIslandSummary,
+  getIslandFog,
   inspectPoint,
 } from "./services/fogModel.js";
 import { renderOverlay } from "./services/render.js";
 
 const api = Router();
 
+// Islands with map boundaries and center
 api.get("/islands", (req, res) => {
   res.json(islands);
 });
 
+// Island days and hours color categories
 api.get("/forecast/:islandId", async (req, res, next) => {
   try {
     const { islandId } = req.params;
@@ -26,6 +28,7 @@ api.get("/forecast/:islandId", async (req, res, next) => {
   }
 });
 
+// Island hour fog prediction image to overlay on the map
 api.get("/fog/:islandId/:hour.png", async (req, res, next) => {
   try {
     const { islandId, hour } = req.params;
@@ -52,6 +55,7 @@ api.get("/fog/:islandId/:hour.png", async (req, res, next) => {
   }
 });
 
+// Island hour pixel information (height, visibility, etc...)
 api.get("/point/:islandId/:hour", async (req, res, next) => {
   try {
     const { islandId, hour } = req.params;
