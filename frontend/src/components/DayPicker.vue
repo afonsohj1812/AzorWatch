@@ -1,15 +1,60 @@
 <script setup>
+import { ref } from "vue";
+
 import { colorOf } from "../constants/fogClasses";
 
-defineProps({
+const props = defineProps({
   days: { type: Array, default: () => [] },
   modelValue: { type: Number, required: true },
 });
-defineEmits(["update:modelValue"]);
+const emit = defineEmits(["update:modelValue"]);
+
+const picker = ref(null);
+const dragging = ref(false);
+
+function select(clientX) {
+  const count = props.days.length;
+  if (!count) return;
+
+  const rect = picker.value.getBoundingClientRect();
+  const ratio = (clientX - rect.left) / rect.width;
+  const next = Math.min(count - 1, Math.max(0, Math.floor(ratio * count)));
+
+  if (next !== props.modelValue) emit("update:modelValue", next);
+}
+
+function onPointerDown(event) {
+  if (!props.days.length) return;
+
+  event.preventDefault();
+  dragging.value = true;
+
+  picker.value.setPointerCapture(event.pointerId);
+  select(event.clientX);
+}
+
+function onPointerMove(event) {
+  if (dragging.value) select(event.clientX);
+}
+
+function onPointerUp(event) {
+  dragging.value = false;
+  if (picker.value?.hasPointerCapture(event.pointerId))
+    picker.value.releasePointerCapture(event.pointerId);
+}
 </script>
 
 <template>
-  <div class="day-picker glass" :style="{ '--days': days.length || 1 }">
+  <div
+    ref="picker"
+    class="day-picker glass"
+    :class="{ dragging }"
+    :style="{ '--days': days.length || 1 }"
+    @pointerdown="onPointerDown"
+    @pointermove="onPointerMove"
+    @pointerup="onPointerUp"
+    @pointercancel="onPointerUp"
+  >
     <button
       v-for="(day, i) in days"
       :key="day.date"
@@ -34,6 +79,7 @@ defineEmits(["update:modelValue"]);
   gap: 0.25rem;
   padding: 0.25rem;
   width: clamp(15rem, calc(100vw - 1rem), calc(var(--days, 4) * 6.25rem));
+  touch-action: none;
 }
 
 .day {
@@ -52,7 +98,7 @@ defineEmits(["update:modelValue"]);
     box-shadow 0.1s ease;
 }
 
-.day:hover {
+.day-picker:not(.dragging) .day:hover {
   background: rgb(255 255 255 / 0.1);
 }
 
