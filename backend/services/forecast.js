@@ -20,7 +20,7 @@ const SURFACE = [
 
 const LEVELS = [1000, 975, 950, 925, 900, 850, 800];
 
-const TTL_MS = Number(process.env.FORECAST_TTL_MINUTES ?? 30) * 60_000;
+const TTL_MS = 30 * 60_000;
 
 let cache = null;
 let inFlight = null;
@@ -84,7 +84,6 @@ async function fetchAll() {
 
   return {
     runAt: new Date().toISOString(),
-    timezone: body[0].timezone,
     islands: byIsland,
   };
 }
@@ -114,6 +113,3 @@ export async function getForecast() {
   return inFlight;
 }
 
-export async function getIslandForecast(id) {
-  return (await getForecast()).islands[id];
-}

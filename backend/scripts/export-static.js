@@ -4,7 +4,7 @@ import { islands } from "../shared/islands.js";
 import { getIslandFog, getIslandSummary } from "../services/fogModel.js";
 import { renderOverlay } from "../services/render.js";
 
-const OUT = process.env.EXPORT_DIR ?? "dist-api";
+const OUT = "dist-api";
 const DEM_DIR = "data/dem";
 
 async function main() {

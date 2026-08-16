@@ -24,7 +24,6 @@ const {
   grid,
   point,
   inspect,
-  error,
 } = useForecast();
 
 const viewReset = ref(0);

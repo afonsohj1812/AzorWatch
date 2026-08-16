@@ -7,4 +7,4 @@ export const FOG_CLASSES = [
 
 const byId = Object.fromEntries(FOG_CLASSES.map((c) => [c.id, c]));
 
-export const colorOf = (id) => byId[id]?.color ?? byId.none.color;
+export const colorOf = (id) => byId[id].color;

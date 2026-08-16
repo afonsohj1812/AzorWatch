@@ -1,6 +1,7 @@
 import { readFile, access } from "node:fs/promises";
 
 import { islands } from "../shared/islands.js";
+import { parseDem } from "../shared/demFormat.js";
 
 const DEM_DIR = "data/dem";
 
@@ -35,24 +36,10 @@ export async function loadDem(id) {
   await ensureDem();
 
   const buf = await readFile(`${DEM_DIR}/${id}.bin`);
-  const headerLength = buf.readUInt32LE(0);
-  const header = JSON.parse(buf.subarray(4, 4 + headerLength));
-  const cells = header.width * header.height;
-
-  let base = buf.byteOffset + 4 + headerLength;
-  let source = buf.buffer;
-  if (base % 4 !== 0) {
-    const copy = Buffer.from(buf.subarray(4 + headerLength));
-    source = copy.buffer;
-    base = copy.byteOffset;
-  }
-
-  const dem = {
-    ...header,
-    elevation: new Int16Array(source, base, cells),
-    aspect: new Uint8Array(source, base + cells * 2, cells),
-    slope: new Uint8Array(source, base + cells * 3, cells),
-  };
+  const dem =
+    buf.byteOffset % 4 === 0
+      ? parseDem(buf.buffer, buf.byteOffset)
+      : parseDem(Uint8Array.from(buf).buffer);
 
   cache.set(id, dem);
   return dem;

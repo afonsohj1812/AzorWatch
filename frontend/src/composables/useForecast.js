@@ -30,8 +30,6 @@ export function useForecast() {
   const dayIndex = ref(0);
   const nowHour = ref(azoresHour());
   const hourIndex = ref(nowHour.value);
-  const loading = ref(false);
-  const error = ref(null);
 
   const ticker = setInterval(() => (nowHour.value = azoresHour()), 60_000);
   onScopeDispose(() => clearInterval(ticker));
@@ -43,15 +41,11 @@ export function useForecast() {
   }
 
   async function loadForecast(id) {
-    loading.value = true;
-    error.value = null;
     try {
       forecast.value = await load(forecastUrl(id));
     } catch (err) {
-      error.value = err.message;
+      console.error(err);
       forecast.value = null;
-    } finally {
-      loading.value = false;
     }
   }
 
@@ -59,9 +53,7 @@ export function useForecast() {
     .then((list) => {
       islands.value = list;
     })
-    .catch((err) => {
-      error.value = err.message;
-    });
+    .catch(console.error);
 
   watch(islandId, loadForecast, { immediate: true });
 
@@ -176,15 +168,11 @@ export function useForecast() {
     islandId,
     island,
     days,
-    day,
     dayIndex,
     hours,
-    hour,
     hourIndex,
     nowHour,
     overlayUrl,
     prefetchUrls,
-    loading,
-    error,
   };
 }

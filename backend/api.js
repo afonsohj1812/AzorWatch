@@ -10,6 +10,10 @@ import { renderOverlay } from "./services/render.js";
 
 const api = Router();
 
+api.param("islandId", (req, res, next, id) =>
+  getIsland(id) ? next() : res.status(404).json({ error: "unknown island" }),
+);
+
 // Islands with map boundaries and center
 api.get("/islands", (req, res) => {
   res.json(islands);
@@ -19,9 +23,6 @@ api.get("/islands", (req, res) => {
 api.get("/forecast/:islandId", async (req, res, next) => {
   try {
     const { islandId } = req.params;
-    if (!getIsland(islandId))
-      return res.status(404).json({ error: "unknown island" });
-
     res.json(await getIslandSummary(islandId));
   } catch (err) {
     next(err);
@@ -32,9 +33,6 @@ api.get("/forecast/:islandId", async (req, res, next) => {
 api.get("/fog/:islandId/:hour.png", async (req, res, next) => {
   try {
     const { islandId, hour } = req.params;
-    if (!getIsland(islandId))
-      return res.status(404).json({ error: "unknown island" });
-
     const fog = await getIslandFog(islandId);
     const index = fog.time.indexOf(hour);
     if (index === -1) return res.status(404).json({ error: "unknown hour" });
@@ -59,9 +57,6 @@ api.get("/fog/:islandId/:hour.png", async (req, res, next) => {
 api.get("/point/:islandId/:hour", async (req, res, next) => {
   try {
     const { islandId, hour } = req.params;
-    if (!getIsland(islandId))
-      return res.status(404).json({ error: "unknown island" });
-
     const x = Number(req.query.x);
     const y = Number(req.query.y);
     if (!Number.isInteger(x) || !Number.isInteger(y))

@@ -7,5 +7,4 @@ RUN npm install
 
 COPY . .
 
-EXPOSE 3000
 CMD ["node", "--watch", "index.js"]
