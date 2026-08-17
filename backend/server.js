@@ -1,4 +1,4 @@
-import { Router } from "express";
+import express from "express";
 
 import { islands, getIsland } from "./shared/islands.js";
 import {
@@ -7,20 +7,31 @@ import {
   inspectPoint,
 } from "./services/fogModel.js";
 import { renderOverlay } from "./services/render.js";
+import { ensureDem } from "./services/dem.js";
 
-const api = Router();
+const app = express();
+const port = Number(process.env.PORT ?? 3000);
 
-api.param("islandId", (req, res, next, id) =>
+app.listen(port, () => {
+  console.log(`BrumaWatch backend listening on :${port}`);
+});
+
+app.use((err, req, res, next) => {
+  console.error(err);
+  res.status(500).json({ error: err.message });
+});
+
+app.param("islandId", (req, res, next, id) =>
   getIsland(id) ? next() : res.status(404).json({ error: "unknown island" }),
 );
 
-// Islands with map boundaries and center
-api.get("/islands", (req, res) => {
+// Islands information
+app.get("/api/islands", (req, res) => {
   res.json(islands);
 });
 
 // Island days and hours color categories
-api.get("/forecast/:islandId", async (req, res, next) => {
+app.get("/api/forecast/:islandId", async (req, res, next) => {
   try {
     const { islandId } = req.params;
     res.json(await getIslandSummary(islandId));
@@ -30,7 +41,7 @@ api.get("/forecast/:islandId", async (req, res, next) => {
 });
 
 // Island hour fog prediction image to overlay on the map
-api.get("/fog/:islandId/:hour.png", async (req, res, next) => {
+app.get("/api/fog/:islandId/:hour.png", async (req, res, next) => {
   try {
     const { islandId, hour } = req.params;
     const fog = await getIslandFog(islandId);
@@ -54,7 +65,7 @@ api.get("/fog/:islandId/:hour.png", async (req, res, next) => {
 });
 
 // Island hour pixel information (height, visibility, etc...)
-api.get("/point/:islandId/:hour", async (req, res, next) => {
+app.get("/api/point/:islandId/:hour", async (req, res, next) => {
   try {
     const { islandId, hour } = req.params;
     const x = Number(req.query.x);
@@ -75,4 +86,4 @@ api.get("/point/:islandId/:hour", async (req, res, next) => {
   }
 });
 
-export default api;
+await ensureDem();

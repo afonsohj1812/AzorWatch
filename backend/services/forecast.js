@@ -112,4 +112,3 @@ export async function getForecast() {
 
   return inFlight;
 }
-

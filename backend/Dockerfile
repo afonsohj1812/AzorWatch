@@ -7,4 +7,4 @@ RUN npm install
 
 COPY . .
 
-CMD ["node", "--watch", "index.js"]
+CMD ["node", "--watch", "server.js"]
