@@ -1,5 +1,5 @@
 import { mkdir, writeFile, access } from "node:fs/promises";
-import { createWriteStream } from "node:fs";
+import { createWriteStream, readFileSync } from "node:fs";
 import { Readable } from "node:stream";
 import { pipeline } from "node:stream/promises";
 import { fromFile } from "geotiff";
@@ -9,7 +9,10 @@ import { islands } from "../shared/islands.js";
 const CACHE_DIR = "data/cache";
 const OUT_DIR = "data/dem";
 
-const CELL_SIZE = 50;
+const { cellSize: CELL_SIZE } = JSON.parse(
+  readFileSync(new URL("../config/fogModel.json", import.meta.url)),
+);
+
 const M_PER_DEG_LAT = 111320;
 const OCEAN = -32768;
 
