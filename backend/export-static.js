@@ -18,13 +18,14 @@ async function main() {
   await copyFile("config/model.json", `${OUT}/config.json`);
   console.log(`islands.json  ${islands.length} islands`);
 
+  const storedAt = new Date().toISOString();
   let bytes = 0;
 
   for (const island of islands) {
     const summary = await getIslandSummary(island.id);
     await writeFile(
       `${OUT}/forecast/${island.id}.json`,
-      JSON.stringify(summary),
+      JSON.stringify({ ...summary, storedAt }),
     );
 
     const fog = await getIslandFog(island.id);
