@@ -56,9 +56,3 @@ export async function saveOverlays(island, runAt, items) {
   await overlays.deleteMany({ island, runAt: { $ne: runAt } });
 }
 
-export async function lastRunAge() {
-  const { forecasts } = await collections();
-  const newest = await forecasts.find().sort({ storedAt: -1 }).limit(1).next();
-
-  return newest ? Date.now() - Date.parse(newest.storedAt) : Infinity;
-}

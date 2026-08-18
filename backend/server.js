@@ -82,4 +82,5 @@ app.get("/api/point/:islandId/:hour", async (req, res, next) => {
   }
 });
 
+await runPipeline();
 cron.schedule("0 * * * *", () => runPipeline().catch(console.error));

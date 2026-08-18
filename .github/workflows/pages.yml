@@ -32,7 +32,7 @@ jobs:
         run: docker compose build
 
       - name: Export the API as static files
-        run: docker compose run --rm backend node scripts/export-static.js
+        run: docker compose run --rm backend node export-static.js
 
       - name: Build the frontend
         run: |

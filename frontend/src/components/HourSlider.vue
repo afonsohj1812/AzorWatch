@@ -107,7 +107,6 @@ function onPointerUp(event) {
         @pointermove="onPointerMove"
         @pointerup="onPointerUp"
         @pointercancel="onPointerUp"
-        @keydown="onKeydown"
       >
         <div
           v-for="(entry, i) in hours"

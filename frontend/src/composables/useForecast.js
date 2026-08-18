@@ -10,7 +10,7 @@ import {
   configUrl,
 } from "../api";
 import { fetchDem } from "../lib/dem";
-import { createFogMath, FOG_CLASS_NAMES, OCEAN } from "../shared/fogMath";
+import { createFogMath, FOG_CLASS_NAMES, OCEAN } from "../services/fogMath";
 
 const DEFAULT_ISLAND = "terceira";
 

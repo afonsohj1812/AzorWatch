@@ -67,7 +67,6 @@ async function download(name) {
 }
 
 async function loadTile(path) {
-  // Imported lazily so the server does not pay for geotiff when the grids already exist.
   const { fromFile } = await import("geotiff");
   const image = await (await fromFile(path)).getImage();
   const [raster] = await image.readRasters();
@@ -233,8 +232,6 @@ const SUMMIT_TOLERANCE = 60;
 const TOTAL_LAND_KM2 = 2322;
 const AREA_TOLERANCE = 0.15;
 
-// A bad decode still produces plausible elevations, so these checks are the only thing
-// that catches it. Failing them must stop the build rather than serve wrong terrain.
 function verify(grids) {
   let failures = 0;
 

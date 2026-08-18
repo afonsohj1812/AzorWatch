@@ -5,7 +5,7 @@ import {
   FOG_CLASS,
   FOG_CLASS_NAMES,
   OCEAN,
-} from "../shared/fogMath.js";
+} from "./fogMath.js";
 import { islands } from "../config/islands.js";
 import { loadDem } from "./dem.js";
 import { getForecast } from "./forecast.js";
