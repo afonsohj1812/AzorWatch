@@ -19,8 +19,10 @@ The forecast gives the height of the cloud base and the cloud top over each isla
 4. **Intersect.** For each cell, compare its elevation with the cloud layer. Below the base
    is clear, inside it is fog that thickens with depth, above the top is clear again. That
    last case is why Pico's summit often stands in sunshine while its flanks are socked in.
-5. **Serve.** Each island-hour is rendered as a small transparent PNG and drawn over a
-   satellite map.
+5. **Store.** An hourly job runs the four steps above for all nine islands, renders each
+   island-hour to a small transparent PNG, and writes the results to MongoDB.
+6. **Serve.** The API only reads from MongoDB, so no request ever runs the model. The
+   overlays are drawn over a satellite map.
 
 Visibility inside cloud comes from the adiabatic liquid water profile via Kunkel's relation,
 bucketed into four classes:
@@ -39,7 +41,7 @@ land fogged, orange past 50% and red past 75%, and a day averages its 24 hours (
 
 ## Running it
 
-Everything runs in Docker.
+Everything runs in Docker, including MongoDB.
 
 ```sh
 docker compose up
@@ -52,7 +54,7 @@ Frontend on `localhost:5173`, backend on `localhost:3000`.
 | endpoint                             | returns                                              |
 | ------------------------------------ | ---------------------------------------------------- |
 | `GET /api/islands`                   | island list with bounding boxes                      |
-| `GET /api/forecast/:island`          | 4 days × 24 hours of class, plus conditions (~17 KB) |
+| `GET /api/forecast/:island`          | 4 days × 24 hours of class, plus conditions (~18 KB) |
 | `GET /api/fog/:island/:hour.png`     | the overlay for one hour (1–30 KB)                   |
 | `GET /api/point/:island/:hour?x=&y=` | one cell: elevation, cloud base/top, visibility      |
 
@@ -66,28 +68,28 @@ server behind it.
 
 ```
 backend/
-  api.js                    all routes
-  shared/
-    fogMath.js              the model, pure and Node-free, shared with the browser
+  server.js                 the four routes, plus the hourly cron
+  export-static.js          writes the API as files for Pages
+  config/
     islands.js              the nine islands and their bounding boxes
+    model.json              every tunable constant, and the class colors
   services/
+    fogMath.js              the model, pure and Node-free, shared with the browser
+    fogModel.js             binds fogMath to the DEM and forecast, renders PNGs, runs the pipeline
     forecast.js             Open-Meteo fetch + cache
-    fogModel.js             wraps fogMath with the DEM, forecast and caching
-    dem.js                  loads the elevation grids
-    render.js               class grid -> PNG
-  scripts/
-    prepare-dem.js          one-off DEM preparation
-    export-static.js        writes the API as files for Pages
-  config/fogModel.json      every tunable constant
+    dem.js                  builds the elevation grids, then loads them
+    db.js                   every MongoDB read and write
 frontend/
   src/api.js                endpoint URLs, live or static
-  src/lib/dem.js            reads the .bin grids in the browser
   src/components/           map + the four control panels
   src/composables/          data fetching and derived state
 ```
 
-`fogMath.js` has no filesystem or network access on purpose: the frontend imports it directly
-(bind-mounted in development, copied in CI) so the fog model exists once, not twice.
+`server.js` and `export-static.js` are the only two files you run. Everything else is imported.
+
+`fogMath.js` has no filesystem or network access on purpose: the frontend imports it directly,
+with `backend/services` and `backend/config` bind-mounted into the frontend container, so the
+fog model and the class colors exist once rather than twice.
 
 ## Data
 
@@ -103,7 +105,7 @@ frontend/
   hour. On a humid but cloudless day the numbers still produce a base a few hundred meters up,
   so the high ground is shown as fogged under a clear sky, and the app has no way to tell that
   case apart from a real deck. This is the single largest source of false fog.
-- **The model is not validated.** Every constant in `config/fogModel.json` is either standard
+- **The model is not validated.** Every constant in `config/model.json` is either standard
   physics or a plausible value chosen by hand and checked against a single day of output.
   Nothing has been compared against observed fog. It is a physically reasoned estimate, not a
   verified forecast.
