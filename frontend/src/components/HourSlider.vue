@@ -1,7 +1,9 @@
 <script setup>
 import { computed, ref } from "vue";
 
-import { colorOf } from "../constants/fogClasses";
+import model from "../config/model.json";
+
+const colorOf = (id) => model.classes.find((c) => c.id === id).color;
 
 const props = defineProps({
   hours: { type: Array, default: () => [] },

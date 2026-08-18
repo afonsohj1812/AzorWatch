@@ -9,10 +9,38 @@ import {
   demUrl,
   configUrl,
 } from "../api";
-import { fetchDem } from "../lib/dem";
 import { createFogMath, FOG_CLASS_NAMES, OCEAN } from "../services/fogMath";
 
 const DEFAULT_ISLAND = "terceira";
+
+const demCache = new Map();
+
+function fetchDem(url) {
+  if (!demCache.has(url))
+    demCache.set(
+      url,
+      fetch(url)
+        .then((res) => res.arrayBuffer())
+        .then((buffer) => {
+          const headerLength = new DataView(buffer).getUint32(0, true);
+          const header = JSON.parse(
+            new TextDecoder().decode(new Uint8Array(buffer, 4, headerLength)),
+          );
+
+          const cells = header.width * header.height;
+          const base = 4 + headerLength;
+
+          return {
+            ...header,
+            elevation: new Int16Array(buffer, base, cells),
+            aspect: new Uint8Array(buffer, base + cells * 2, cells),
+            slope: new Uint8Array(buffer, base + cells * 3, cells),
+          };
+        }),
+    );
+
+  return demCache.get(url);
+}
 
 const azoresHour = () =>
   Number(

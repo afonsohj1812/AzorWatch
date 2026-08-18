@@ -1,7 +1,9 @@
 <script setup>
 import { ref } from "vue";
 
-import { FOG_CLASSES } from "../constants/fogClasses";
+import model from "../config/model.json";
+
+const FOG_CLASSES = model.classes;
 
 defineProps({
   collapsible: { type: Boolean, default: false },

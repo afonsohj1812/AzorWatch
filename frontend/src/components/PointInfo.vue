@@ -1,7 +1,9 @@
 <script setup>
 import { computed } from "vue";
 
-import { FOG_CLASSES } from "../constants/fogClasses";
+import model from "../config/model.json";
+
+const FOG_CLASSES = model.classes;
 
 const props = defineProps({
   point: { type: Object, default: null },

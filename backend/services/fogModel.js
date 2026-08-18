@@ -1,15 +1,10 @@
 import { readFileSync } from "node:fs";
+import { PNG } from "pngjs";
 
-import {
-  createFogMath,
-  FOG_CLASS,
-  FOG_CLASS_NAMES,
-  OCEAN,
-} from "./fogMath.js";
+import { createFogMath, FOG_CLASS, FOG_CLASS_NAMES, OCEAN } from "./fogMath.js";
 import { islands } from "../config/islands.js";
 import { loadDem } from "./dem.js";
 import { getForecast } from "./forecast.js";
-import { renderOverlay } from "./render.js";
 import { saveForecast, saveOverlays } from "./db.js";
 
 const config = JSON.parse(
@@ -17,6 +12,10 @@ const config = JSON.parse(
 );
 
 const math = createFogMath(config);
+
+const PALETTE = FOG_CLASS_NAMES.map(
+  (name) => config.classes.find((c) => c.id === name).rgb,
+);
 
 const { hourConditions, localBase, classifyCell, classifyHour, visibilityAt } =
   math;
@@ -174,17 +173,35 @@ export function inspectCell(dem, c, time, x, y) {
   };
 }
 
+export function renderOverlay(fog, id, hour) {
+  const classes = fog.grids[hour];
+  const png = new PNG({ width: fog.width, height: fog.height });
+
+  for (let i = 0; i < classes.length; i++) {
+    const [r, g, b, a] = PALETTE[classes[i]];
+    const p = i * 4;
+    png.data[p] = r;
+    png.data[p + 1] = g;
+    png.data[p + 2] = b;
+    png.data[p + 3] = a;
+  }
+
+  return {
+    buffer: PNG.sync.write(png),
+    etag: `"${fog.runAt}:${id}:${hour}"`,
+  };
+}
+
 let running = false;
 
 export async function runPipeline() {
   if (running)
-    return console.log("pipeline: previous run still going, skipped");
+    return console.log("Pipeline: previous run still going, skipped");
 
   running = true;
-  const started = Date.now();
-  const storedAt = new Date(started).toISOString();
-  let bytes = 0;
+  const storedAt = new Date(Date.now()).toISOString();
 
+  let bytes = 0;
   try {
     for (const island of islands) {
       const summary = await getIslandSummary(island.id);
@@ -201,10 +218,6 @@ export async function runPipeline() {
 
       await saveOverlays(island.id, fog.runAt, items);
     }
-
-    console.log(
-      `pipeline: ${islands.length} islands, ${(bytes / 1024 / 1024).toFixed(1)} MB of overlays, ${((Date.now() - started) / 1000).toFixed(1)}s`,
-    );
   } finally {
     running = false;
   }

@@ -2,14 +2,8 @@
   "cellSize": 50,
   "forecastDays": 4,
 
-  "cloudBase": {
-    "saturationRh": 90,
-    "lclCoefficient": 125
-  },
-  "cloudTop": {
-    "exitRh": 85,
-    "maxThickness": 1500
-  },
+  "cloudBase": { "saturationRh": 90, "lclCoefficient": 125 },
+  "cloudTop": { "exitRh": 85, "maxThickness": 1500 },
   "windward": {
     "aspectTolerance": 60,
     "minSlope": 5,
@@ -18,26 +12,37 @@
     "fullEffectSlope": 30
   },
 
-  "lwc": {
-    "adiabaticGradient": 2.0,
-    "subAdiabaticFactor": 0.5
-  },
-  "kunkel": {
-    "coefficient": 144.7,
-    "exponent": 0.88
-  },
-
-  "mist": {
-    "belowBaseBand": 125
-  },
+  "lwc": { "adiabaticGradient": 2.0, "subAdiabaticFactor": 0.5 },
+  "kunkel": { "coefficient": 144.7, "exponent": 0.88 },
+  "mist": { "belowBaseBand": 100 },
 
   "classThresholds": { "yellow": 10000, "orange": 1000, "red": 100 },
-  "summary": {
-    "coverage": { "yellow": 0.25, "orange": 0.5, "red": 0.75 }
-  },
-  "colors": {
-    "yellow": [255, 255, 63, 127],
-    "orange": [255, 127, 63, 127],
-    "red": [255, 63, 63, 127]
-  }
+  "summary": { "coverage": { "yellow": 0.25, "orange": 0.5, "red": 0.75 } },
+
+  "classes": [
+    {
+      "id": "red",
+      "color": "#ff3f3f",
+      "rgb": [255, 63, 63, 127],
+      "range": "10m - 100m"
+    },
+    {
+      "id": "orange",
+      "color": "#ff7f3f",
+      "rgb": [255, 127, 63, 127],
+      "range": "100m - 1km"
+    },
+    {
+      "id": "yellow",
+      "color": "#ffff3f",
+      "rgb": [255, 255, 63, 127],
+      "range": "1km - 10km"
+    },
+    {
+      "id": "none",
+      "color": "#dfdfdf",
+      "rgb": [0, 0, 0, 0],
+      "range": "> 10km"
+    }
+  ]
 }

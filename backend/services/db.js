@@ -14,7 +14,7 @@ function collections() {
     const overlays = database.collection("overlays");
     await overlays.createIndex({ island: 1, runAt: 1 });
 
-    console.log(`mongo: connected to ${url}`);
+    console.log(`Mongo: connected to ${url}`);
     return { forecasts, overlays };
   })();
 
@@ -55,4 +55,3 @@ export async function saveOverlays(island, runAt, items) {
 
   await overlays.deleteMany({ island, runAt: { $ne: runAt } });
 }
-

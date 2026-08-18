@@ -23,6 +23,7 @@ services:
     volumes:
       - ./frontend:/app
       - ./backend/services:/app/src/services:ro
+      - ./backend/config:/app/src/config:ro
       - /app/node_modules
 
 volumes:
