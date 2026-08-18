@@ -6,8 +6,11 @@ import {
   FOG_CLASS_NAMES,
   OCEAN,
 } from "../shared/fogMath.js";
+import { islands } from "../shared/islands.js";
 import { loadDem } from "./dem.js";
 import { getForecast } from "./forecast.js";
+import { renderOverlay } from "./render.js";
+import { saveForecast, saveOverlays } from "./db.js";
 
 const config = JSON.parse(
   readFileSync(new URL("../config/fogModel.json", import.meta.url)),
@@ -15,15 +18,16 @@ const config = JSON.parse(
 
 const math = createFogMath(config);
 
-const { hourConditions, localBase, classifyHour, visibilityAt } = math;
+const { hourConditions, localBase, classifyCell, classifyHour, visibilityAt } =
+  math;
 
 const HOURS_PER_DAY = 24;
 
 const bundles = new Map();
 
 export async function getIslandFog(id) {
-  const { runAt, islands } = await getForecast();
-  const forecast = islands[id];
+  const { runAt, islands: byIsland } = await getForecast();
+  const forecast = byIsland[id];
   if (!forecast) return null;
 
   const cached = bundles.get(id);
@@ -99,8 +103,8 @@ const weekday = (date) =>
   });
 
 export async function getIslandSummary(id) {
-  const { islands } = await getForecast();
-  const forecast = islands[id];
+  const { islands: byIsland } = await getForecast();
+  const forecast = byIsland[id];
   if (!forecast) return null;
 
   const fog = await getIslandFog(id);
@@ -142,31 +146,23 @@ export async function getIslandSummary(id) {
   };
 }
 
-export async function inspectPoint(id, hour, x, y) {
-  const fog = await getIslandFog(id);
-  if (!fog || hour < 0 || hour >= fog.time.length) return null;
-  if (x < 0 || y < 0 || x >= fog.width || y >= fog.height) return null;
+export function inspectCell(dem, c, time, x, y) {
+  if (x < 0 || y < 0 || x >= dem.width || y >= dem.height) return null;
 
-  const dem = await loadDem(id);
-  const index = y * fog.width + x;
+  const index = y * dem.width + x;
   const z = dem.elevation[index];
 
-  const point = {
-    time: fog.time[hour],
-    x,
-    y,
-    sea: z === OCEAN,
-    class: FOG_CLASS_NAMES[fog.grids[hour][index]],
-  };
+  if (z === OCEAN) return { time, x, y, sea: true, class: "none" };
 
-  if (point.sea) return point;
-
-  const c = hourConditions((await getForecast()).islands[id], hour);
   const base = localBase(dem.aspect[index], dem.slope[index], c);
-  const fogClass = fog.grids[hour][index];
+  const fogClass = classifyCell(z, base, c);
 
   return {
-    ...point,
+    time,
+    x,
+    y,
+    sea: false,
+    class: FOG_CLASS_NAMES[fogClass],
     elevation: z,
     slope: dem.slope[index],
     aspect: dem.aspect[index] * 2,
@@ -176,4 +172,39 @@ export async function inspectPoint(id, hour, x, y) {
     aboveCloud: z > c.top,
     visibility: visibilityAt(z, base, fogClass, c),
   };
+}
+
+let running = false;
+
+export async function runPipeline() {
+  if (running)
+    return console.log("pipeline: previous run still going, skipped");
+
+  running = true;
+  const started = Date.now();
+  let bytes = 0;
+
+  try {
+    for (const island of islands) {
+      const summary = await getIslandSummary(island.id);
+      const fog = await getIslandFog(island.id);
+
+      await saveForecast(island.id, { ...summary, time: fog.time });
+
+      const items = fog.time.map((time, hour) => {
+        const overlay = renderOverlay(fog, island.id, hour);
+        bytes += overlay.buffer.length;
+
+        return { time, etag: overlay.etag, png: overlay.buffer };
+      });
+
+      await saveOverlays(island.id, fog.runAt, items);
+    }
+
+    console.log(
+      `pipeline: ${islands.length} islands, ${(bytes / 1024 / 1024).toFixed(1)} MB of overlays, ${((Date.now() - started) / 1000).toFixed(1)}s`,
+    );
+  } finally {
+    running = false;
+  }
 }

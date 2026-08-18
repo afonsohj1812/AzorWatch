@@ -1,8 +1,6 @@
 import { readFileSync } from "node:fs";
 import { PNG } from "pngjs";
 
-import { getIslandFog } from "./fogModel.js";
-
 const config = JSON.parse(
   readFileSync(new URL("../config/fogModel.json", import.meta.url)),
 );
@@ -14,16 +12,7 @@ const PALETTE = [
   config.colors.red,
 ];
 
-const cache = new Map();
-
-export async function renderOverlay(id, hour) {
-  const fog = await getIslandFog(id);
-  if (!fog || hour < 0 || hour >= fog.grids.length) return null;
-
-  const key = `${id}:${hour}:${fog.runAt}`;
-  const hit = cache.get(key);
-  if (hit) return hit;
-
+export function renderOverlay(fog, id, hour) {
   const classes = fog.grids[hour];
   const png = new PNG({ width: fog.width, height: fog.height });
 
@@ -36,11 +25,8 @@ export async function renderOverlay(id, hour) {
     png.data[p + 3] = a;
   }
 
-  const result = {
+  return {
     buffer: PNG.sync.write(png),
     etag: `"${fog.runAt}:${id}:${hour}"`,
   };
-
-  cache.set(key, result);
-  return result;
 }

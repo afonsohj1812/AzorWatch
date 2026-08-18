@@ -1,6 +1,15 @@
 services:
+  mongo:
+    image: mongo:7
+    volumes:
+      - mongo-data:/data/db
+
   backend:
     build: ./backend
+    depends_on:
+      - mongo
+    environment:
+      MONGO_URL: mongodb://mongo:27017
     ports:
       - "3000:3000"
     volumes:
@@ -15,3 +24,6 @@ services:
       - ./frontend:/app
       - ./backend/shared:/app/src/shared:ro
       - /app/node_modules
+
+volumes:
+  mongo-data:

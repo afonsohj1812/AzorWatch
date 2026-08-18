@@ -29,7 +29,7 @@ async function main() {
 
     let islandBytes = 0;
     for (let hour = 0; hour < fog.time.length; hour++) {
-      const overlay = await renderOverlay(island.id, hour);
+      const overlay = renderOverlay(fog, island.id, hour);
       await writeFile(
         `${OUT}/fog/${island.id}/${fog.time[hour]}.png`,
         overlay.buffer,
