@@ -24,6 +24,7 @@ const {
   grid,
   point,
   inspect,
+  updatedLabel,
 } = useForecast();
 
 const viewReset = ref(0);
@@ -71,7 +72,9 @@ const currentHour = computed(() =>
     </div>
 
     <p class="panel credits">
-      Imagery &copy; Esri &middot; Elevation &copy; Copernicus
+      &copy; Esri &middot; &copy; Copernicus<span v-if="updatedLabel">
+        &middot; Forecast updated {{ updatedLabel }}</span
+      >
     </p>
   </div>
 </template>
@@ -126,7 +129,7 @@ const currentHour = computed(() =>
   pointer-events: none;
 }
 
-@media (max-width: 1024px) {
+@media (max-width: 1472px) {
   .panel--bottom {
     bottom: 2rem;
     left: 0.5rem;
@@ -157,6 +160,10 @@ const currentHour = computed(() =>
     top: 6rem;
     right: 0.5rem;
     transform: none;
+  }
+
+  .credits span {
+    font-size: 0.9rem;
   }
 }
 </style>

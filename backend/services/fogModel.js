@@ -182,6 +182,7 @@ export async function runPipeline() {
 
   running = true;
   const started = Date.now();
+  const storedAt = new Date(started).toISOString();
   let bytes = 0;
 
   try {
@@ -189,7 +190,7 @@ export async function runPipeline() {
       const summary = await getIslandSummary(island.id);
       const fog = await getIslandFog(island.id);
 
-      await saveForecast(island.id, { ...summary, time: fog.time });
+      await saveForecast(island.id, { ...summary, storedAt, time: fog.time });
 
       const items = fog.time.map((time, hour) => {
         const overlay = renderOverlay(fog, island.id, hour);

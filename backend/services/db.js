@@ -58,7 +58,7 @@ export async function saveOverlays(island, runAt, items) {
 
 export async function lastRunAge() {
   const { forecasts } = await collections();
-  const newest = await forecasts.find().sort({ runAt: -1 }).limit(1).next();
+  const newest = await forecasts.find().sort({ storedAt: -1 }).limit(1).next();
 
-  return newest ? Date.now() - Date.parse(newest.runAt) : Infinity;
+  return newest ? Date.now() - Date.parse(newest.storedAt) : Infinity;
 }

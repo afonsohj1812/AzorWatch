@@ -30,8 +30,18 @@ export function useForecast() {
   const dayIndex = ref(0);
   const nowHour = ref(azoresHour());
   const hourIndex = ref(nowHour.value);
+  const now = ref(Date.now());
 
-  const ticker = setInterval(() => (nowHour.value = azoresHour()), 60_000);
+  const ticker = setInterval(async () => {
+    now.value = Date.now();
+    nowHour.value = azoresHour();
+
+    try {
+      forecast.value = await load(forecastUrl(islandId.value));
+    } catch (err) {
+      console.error(err);
+    }
+  }, 60_000);
   onScopeDispose(() => clearInterval(ticker));
 
   async function load(url) {
@@ -76,6 +86,20 @@ export function useForecast() {
       .map((i) => overlayFor(hours.value[i].time)),
   );
 
+  const updatedLabel = computed(() => {
+    if (!forecast.value?.storedAt) return null;
+
+    const minutes = Math.max(
+      0,
+      Math.round((now.value - Date.parse(forecast.value.storedAt)) / 60_000),
+    );
+    if (minutes < 1) return "just now";
+    if (minutes < 60) return `${minutes} min ago`;
+
+    const hours = Math.round(minutes / 60);
+    return hours === 1 ? "1 hour ago" : `${hours} hours ago`;
+  });
+
   const grid = computed(() =>
     forecast.value
       ? { width: forecast.value.width, height: forecast.value.height }
@@ -98,8 +122,7 @@ export function useForecast() {
     const base = { time: hour.value.time, x, y };
     if (z === OCEAN) return { ...base, sea: true, class: "none" };
 
-    const c =
-      forecast.value.conditions[dayIndex.value * 24 + hourIndex.value];
+    const c = forecast.value.conditions[dayIndex.value * 24 + hourIndex.value];
 
     const cloudBase = math.localBase(dem.aspect[index], dem.slope[index], c);
     const fogClass = math.classifyCell(z, cloudBase, c);
@@ -174,5 +197,6 @@ export function useForecast() {
     nowHour,
     overlayUrl,
     prefetchUrls,
+    updatedLabel,
   };
 }
