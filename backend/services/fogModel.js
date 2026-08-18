@@ -6,14 +6,14 @@ import {
   FOG_CLASS_NAMES,
   OCEAN,
 } from "../shared/fogMath.js";
-import { islands } from "../shared/islands.js";
+import { islands } from "../config/islands.js";
 import { loadDem } from "./dem.js";
 import { getForecast } from "./forecast.js";
 import { renderOverlay } from "./render.js";
 import { saveForecast, saveOverlays } from "./db.js";
 
 const config = JSON.parse(
-  readFileSync(new URL("../config/fogModel.json", import.meta.url)),
+  readFileSync(new URL("../config/model.json", import.meta.url)),
 );
 
 const math = createFogMath(config);

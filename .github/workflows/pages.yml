@@ -26,7 +26,7 @@ jobs:
         id: dem
         with:
           path: backend/data
-          key: dem-${{ hashFiles('backend/services/dem.js', 'backend/shared/islands.js') }}
+          key: dem-${{ hashFiles('backend/services/dem.js', 'backend/config/islands.js') }}
 
       - name: Build images
         run: docker compose build

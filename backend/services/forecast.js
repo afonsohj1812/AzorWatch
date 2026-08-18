@@ -1,11 +1,11 @@
 import { readFileSync } from "node:fs";
 
-import { islands } from "../shared/islands.js";
+import { islands } from "../config/islands.js";
 
 const API = "https://api.open-meteo.com/v1/forecast";
 
 const { forecastDays } = JSON.parse(
-  readFileSync(new URL("../config/fogModel.json", import.meta.url)),
+  readFileSync(new URL("../config/model.json", import.meta.url)),
 );
 
 const HOURS_PER_DAY = 24;

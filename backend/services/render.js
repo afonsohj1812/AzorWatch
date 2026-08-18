@@ -2,7 +2,7 @@ import { readFileSync } from "node:fs";
 import { PNG } from "pngjs";
 
 const config = JSON.parse(
-  readFileSync(new URL("../config/fogModel.json", import.meta.url)),
+  readFileSync(new URL("../config/model.json", import.meta.url)),
 );
 
 const PALETTE = [

@@ -1,6 +1,6 @@
 import { mkdir, writeFile, copyFile, readdir } from "node:fs/promises";
 
-import { islands } from "../shared/islands.js";
+import { islands } from "../config/islands.js";
 import { getIslandFog, getIslandSummary } from "../services/fogModel.js";
 import { renderOverlay } from "../services/render.js";
 
@@ -12,7 +12,7 @@ async function main() {
   await mkdir(`${OUT}/dem`, { recursive: true });
 
   await writeFile(`${OUT}/islands.json`, JSON.stringify(islands));
-  await copyFile("config/fogModel.json", `${OUT}/config.json`);
+  await copyFile("config/model.json", `${OUT}/config.json`);
   console.log(`islands.json  ${islands.length} islands`);
 
   let bytes = 0;

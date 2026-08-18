@@ -3,14 +3,13 @@ import { createWriteStream, readFileSync } from "node:fs";
 import { Readable } from "node:stream";
 import { pipeline } from "node:stream/promises";
 
-import { islands } from "../shared/islands.js";
-import { parseDem } from "../shared/demFormat.js";
+import { islands } from "../config/islands.js";
 
 const DEM_DIR = "data/dem";
 const CACHE_DIR = "data/cache";
 
 const { cellSize } = JSON.parse(
-  readFileSync(new URL("../config/fogModel.json", import.meta.url)),
+  readFileSync(new URL("../config/model.json", import.meta.url)),
 );
 
 const M_PER_DEG_LAT = 111320;
@@ -337,6 +336,23 @@ export async function ensureDem() {
   })();
 
   return preparing;
+}
+
+function parseDem(buffer, offset = 0) {
+  const headerLength = new DataView(buffer, offset).getUint32(0, true);
+  const header = JSON.parse(
+    new TextDecoder().decode(new Uint8Array(buffer, offset + 4, headerLength)),
+  );
+
+  const cells = header.width * header.height;
+  const base = offset + 4 + headerLength;
+
+  return {
+    ...header,
+    elevation: new Int16Array(buffer, base, cells),
+    aspect: new Uint8Array(buffer, base + cells * 2, cells),
+    slope: new Uint8Array(buffer, base + cells * 3, cells),
+  };
 }
 
 export async function loadDem(id) {

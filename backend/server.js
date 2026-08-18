@@ -1,8 +1,8 @@
 import express from "express";
 import cron from "node-cron";
 
-import { islands, getIsland } from "./shared/islands.js";
-import { findForecast, findOverlay, lastRunAge } from "./services/db.js";
+import { islands, getIsland } from "./config/islands.js";
+import { findForecast, findOverlay } from "./services/db.js";
 import { loadDem } from "./services/dem.js";
 import { inspectCell, runPipeline } from "./services/fogModel.js";
 
