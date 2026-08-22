@@ -12,8 +12,6 @@ const props = defineProps({
 });
 const emit = defineEmits(["inspect"]);
 
-const MIN_INSPECT_ZOOM = 14;
-
 const container = ref(null);
 let map = null;
 let overlay = null;
@@ -121,8 +119,6 @@ function clearCell() {
 }
 
 function onMapMove(event) {
-  if (map.getZoom() < MIN_INSPECT_ZOOM) return clearCell();
-
   const cell = cellAt(event.latlng);
   if (!cell) return clearCell();
 
@@ -164,10 +160,6 @@ onMounted(async () => {
   map.on("click", onMapMove);
   map.on("dblclick", (event) => zoomBy(1, event.latlng));
   container.value.addEventListener("wheel", onWheel, { passive: false });
-
-  map.on("zoomend", () => {
-    if (map.getZoom() < MIN_INSPECT_ZOOM) clearCell();
-  });
 
   await nextTick();
   map.invalidateSize();

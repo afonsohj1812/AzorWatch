@@ -49,8 +49,6 @@ const depthText = computed(() => {
           <dt>Cloud</dt>
           <dd>{{ metres(point.cloudBase) }} – {{ metres(point.cloudTop) }}</dd>
         </template>
-        <dt>Slope</dt>
-        <dd>{{ point.slope }}°</dd>
       </dl>
     </template>
   </div>
