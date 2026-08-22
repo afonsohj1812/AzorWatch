@@ -37,7 +37,7 @@ jobs:
       - name: Build the frontend
         run: |
           docker compose run --rm \
-            -e VITE_BASE=/BrumaWatch/ \
+            -e VITE_BASE=/AzorWatch/ \
             -e VITE_STATIC=1 \
             frontend npm run build
 

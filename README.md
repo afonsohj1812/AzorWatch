@@ -1,8 +1,8 @@
-# BrumaWatch
+# AzorWatch
 
 An app that predicts fog across the 9 Azores islands for today and the next 3 days in a 50×50m color-coded map (no fog / yellow / orange / red).
 
-**Live demo:** https://afonsohj1812.github.io/BrumaWatch (rebuilt every 6 hours, so the forecast can be a few hours behind).
+**Live demo:** https://afonsohj1812.github.io/AzorWatch (rebuilt every 6 hours, so the forecast can be a few hours behind).
 
 ![Fog forecast over São Miguel](docs/preview.png)
 

@@ -8,7 +8,7 @@ let ready = null;
 function collections() {
   ready ??= (async () => {
     await client.connect();
-    const database = client.db("brumawatch");
+    const database = client.db("azorwatch");
 
     const forecasts = database.collection("forecasts");
     const overlays = database.collection("overlays");

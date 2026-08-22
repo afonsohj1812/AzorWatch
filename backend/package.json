@@ -1,5 +1,5 @@
 {
-  "name": "brumawatch-backend",
+  "name": "azorwatch-backend",
   "private": true,
   "type": "module",
   "dependencies": {

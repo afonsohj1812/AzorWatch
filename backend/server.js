@@ -10,7 +10,7 @@ const app = express();
 const port = Number(process.env.PORT ?? 3000);
 
 app.listen(port, () => {
-  console.log(`BrumaWatch backend listening on :${port}`);
+  console.log(`AzorWatch backend listening on :${port}`);
 });
 
 app.use((err, req, res, next) => {
