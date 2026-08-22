@@ -1,6 +1,7 @@
 {
   "cellSize": 50,
   "forecastDays": 4,
+  "sea": { "bandMeters": 1000 },
 
   "cloudBase": { "saturationRh": 90, "lclCoefficient": 125 },
   "cloudTop": { "exitRh": 85, "maxThickness": 1500 },
