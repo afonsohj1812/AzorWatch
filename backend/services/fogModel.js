@@ -4,6 +4,7 @@ import { PNG } from "pngjs";
 import { createFogMath, FOG_CLASS, FOG_CLASS_NAMES, OCEAN } from "./fogMath.js";
 import { islands } from "../config/islands.js";
 import { loadDem } from "./dem.js";
+import { dayLabel, weekday } from "./dates.js";
 import { getForecast } from "./forecast.js";
 import { saveForecast, saveOverlays } from "./db.js";
 
@@ -27,19 +28,6 @@ const {
 } = math;
 
 const HOURS_PER_DAY = 24;
-
-const asUtc = (date) => new Date(`${date}T00:00:00Z`);
-const dayLabel = (date) =>
-  asUtc(date).toLocaleDateString("en-GB", {
-    day: "numeric",
-    month: "short",
-    timeZone: "UTC",
-  });
-const weekday = (date) =>
-  asUtc(date).toLocaleDateString("en-GB", {
-    weekday: "short",
-    timeZone: "UTC",
-  });
 
 function renderOverlay(classes, width, height) {
   const png = new PNG({ width, height });

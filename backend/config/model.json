@@ -29,7 +29,9 @@
     },
 
     "classThresholds": { "green": 0.2, "yellow": 0.4, "orange": 0.6 },
-    "summary": { "coverage": { "yellow": 0.25, "orange": 0.5, "red": 0.75 } },
+    "summary": { "percentile": 0.25 },
+    "neighbors": 3,
+    "idwPower": 3,
 
     "classes": [
       {
