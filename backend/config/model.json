@@ -1,7 +1,63 @@
 {
   "cellSize": 50,
   "forecastDays": 4,
-  "sea": { "bandMeters": 1000, "sampleGridDegrees": 0.0833333 },
+  "sea": {
+    "bandMeters": 1000,
+    "sampleGridDegrees": 0.0833333,
+
+    "layers": {
+      "wave": { "perfect": 0.3, "unusable": 2.0, "weight": 3.0 },
+      "visibility": { "perfect": 0, "unusable": 1, "weight": 2.5 },
+      "current": { "perfect": 0.4, "unusable": 2.2, "weight": 2.0 },
+      "wind": { "perfect": 8, "unusable": 30, "weight": 1.5 },
+      "gusts": { "perfect": 15, "unusable": 45, "weight": 1.0 },
+      "period": { "perfect": 9, "unusable": 4, "weight": 1.0 },
+      "temperature": { "perfect": 21, "unusable": 15, "weight": 0.5 }
+    },
+
+    "turbidity": {
+      "stirHours": 12,
+      "stirHalfLife": 6,
+      "stirWeight": 0.7,
+      "waveClear": 0.3,
+      "waveMurky": 2.0,
+      "runoffHours": 24,
+      "runoffHalfLife": 12,
+      "runoffWeight": 0.3,
+      "rainClear": 0,
+      "rainMurky": 10
+    },
+
+    "classThresholds": { "green": 0.2, "yellow": 0.4, "orange": 0.6 },
+    "summary": { "coverage": { "yellow": 0.25, "orange": 0.5, "red": 0.75 } },
+
+    "classes": [
+      {
+        "id": "green",
+        "color": "#3fff9f",
+        "rgb": [63, 255, 159, 127],
+        "range": "excellent"
+      },
+      {
+        "id": "yellow",
+        "color": "#ffff3f",
+        "rgb": [255, 255, 63, 127],
+        "range": "good"
+      },
+      {
+        "id": "orange",
+        "color": "#ff7f3f",
+        "rgb": [255, 127, 63, 127],
+        "range": "marginal"
+      },
+      {
+        "id": "red",
+        "color": "#ff3f3f",
+        "rgb": [255, 63, 63, 127],
+        "range": "unusable"
+      }
+    ]
+  },
 
   "cloudBase": { "saturationRh": 90, "lclCoefficient": 125 },
   "cloudTop": { "exitRh": 85, "maxThickness": 1500 },

@@ -1,0 +1,116 @@
+export const SEA_CLASS = { GREEN: 0, YELLOW: 1, ORANGE: 2, RED: 3 };
+
+export const SEA_CLASS_NAMES = ["green", "yellow", "orange", "red"];
+
+export const LAYER_SOURCES = {
+  wave: "wave_height",
+  current: "ocean_current_velocity",
+  wind: "wind_speed_10m",
+  gusts: "wind_gusts_10m",
+  period: "swell_wave_period",
+  temperature: "sea_surface_temperature",
+};
+
+export function createSeaMath(config) {
+  const { layers, turbidity, classThresholds } = config.sea;
+
+  function normalize(value, perfect, unusable) {
+    if (!Number.isFinite(value)) return null;
+
+    const span = unusable - perfect;
+    if (span === 0) return 0;
+
+    return Math.min(1, Math.max(0, (value - perfect) / span));
+  }
+
+  function decayed(series, index, hours, halfLife, average) {
+    let sum = 0;
+    let weights = 0;
+
+    for (let back = 0; back < hours; back++) {
+      const i = index - back;
+      if (i < 0) break;
+
+      const value = series?.[i];
+      if (!Number.isFinite(value)) continue;
+
+      const weight = Math.pow(0.5, back / halfLife);
+      sum += value * weight;
+      weights += weight;
+    }
+
+    if (!weights) return null;
+    return average ? sum / weights : sum;
+  }
+
+  function turbidityAt(sample, index) {
+    const stirred = decayed(
+      sample.wave_height,
+      index,
+      turbidity.stirHours,
+      turbidity.stirHalfLife,
+      true,
+    );
+    const rained = decayed(
+      sample.precipitation,
+      index,
+      turbidity.runoffHours,
+      turbidity.runoffHalfLife,
+      false,
+    );
+
+    const stir =
+      normalize(stirred, turbidity.waveClear, turbidity.waveMurky) ?? 0;
+    const runoff =
+      normalize(rained, turbidity.rainClear, turbidity.rainMurky) ?? 0;
+
+    return Math.min(
+      1,
+      turbidity.stirWeight * stir + turbidity.runoffWeight * runoff,
+    );
+  }
+
+  function layerValues(sample, index) {
+    const values = { visibility: turbidityAt(sample, index) };
+
+    for (const [name, source] of Object.entries(LAYER_SOURCES))
+      values[name] = sample[source]?.[index] ?? null;
+
+    return values;
+  }
+
+  function layerScores(sample, index) {
+    const values = layerValues(sample, index);
+    const scores = {};
+
+    for (const [name, spec] of Object.entries(layers))
+      scores[name] = normalize(values[name], spec.perfect, spec.unusable);
+
+    return scores;
+  }
+
+  function score(sample, index) {
+    const scores = layerScores(sample, index);
+
+    let sum = 0;
+    let weights = 0;
+
+    for (const [name, spec] of Object.entries(layers)) {
+      if (scores[name] === null) continue;
+      sum += scores[name] * spec.weight;
+      weights += spec.weight;
+    }
+
+    return weights === 0 ? null : sum / weights;
+  }
+
+  function classify(value) {
+    if (value === null) return null;
+    if (value < classThresholds.green) return SEA_CLASS.GREEN;
+    if (value < classThresholds.yellow) return SEA_CLASS.YELLOW;
+    if (value < classThresholds.orange) return SEA_CLASS.ORANGE;
+    return SEA_CLASS.RED;
+  }
+
+  return { normalize, turbidityAt, layerValues, layerScores, score, classify };
+}
