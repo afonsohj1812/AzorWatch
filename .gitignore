@@ -2,6 +2,7 @@ node_modules/
 backend/data/
 backend/dist-api/
 frontend/dist/
-frontend/src/shared/
+frontend/src/services/
+frontend/src/config/
 .env
 *.log

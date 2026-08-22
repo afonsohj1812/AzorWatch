@@ -17,7 +17,8 @@ const metres = (value) => `${Math.round(value).toLocaleString("en-GB")} m`;
 const depthText = computed(() => {
   const p = props.point;
   if (!p || p.sea) return null;
-  if (p.aboveCloud) return "above the cloud top";
+  if (p.cloudy === false) return "No low cloud forecast";
+  if (p.aboveCloud) return "Above the cloud top";
   return p.depth >= 0
     ? `${metres(p.depth)} into the cloud`
     : `${metres(-p.depth)} below the base`;
@@ -44,8 +45,10 @@ const depthText = computed(() => {
       <dl class="detail">
         <dt>Elevation</dt>
         <dd>{{ metres(point.elevation) }}</dd>
-        <dt>Cloud</dt>
-        <dd>{{ metres(point.cloudBase) }} – {{ metres(point.cloudTop) }}</dd>
+        <template v-if="point.cloudy !== false">
+          <dt>Cloud</dt>
+          <dd>{{ metres(point.cloudBase) }} – {{ metres(point.cloudTop) }}</dd>
+        </template>
         <dt>Slope</dt>
         <dd>{{ point.slope }}°</dd>
       </dl>

@@ -9,15 +9,6 @@ import { inspectCell, runPipeline } from "./services/fogModel.js";
 const app = express();
 const port = Number(process.env.PORT ?? 3000);
 
-app.listen(port, () => {
-  console.log(`AzorWatch backend listening on :${port}`);
-});
-
-app.use((err, req, res, next) => {
-  console.error(err);
-  res.status(500).json({ error: err.message });
-});
-
 app.param("islandId", (req, res, next, id) =>
   getIsland(id) ? next() : res.status(404).json({ error: "unknown island" }),
 );
@@ -80,6 +71,15 @@ app.get("/api/point/:islandId/:hour", async (req, res, next) => {
   } catch (err) {
     next(err);
   }
+});
+
+app.use((err, req, res, next) => {
+  console.error(err);
+  res.status(500).json({ error: err.message });
+});
+
+app.listen(port, () => {
+  console.log(`AzorWatch backend listening on :${port}`);
 });
 
 await runPipeline();

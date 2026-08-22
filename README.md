@@ -11,10 +11,12 @@ An app that predicts fog across the 9 Azores islands for today and the next 3 da
 The forecast gives the height of the cloud base and the cloud top over each island. The elevation grid gives the height of the ground at every 50m cell. A cell is foggy when its elevation falls between the two, and the deeper it sits into the cloud, the lower the visibility.
 
 1. **Forecast.** One Open-Meteo request covers all nine islands: surface temperature, dew
-   point and wind, plus temperature, humidity and height on seven pressure levels from sea
-   level to ~2000m.
+   point, wind and low cloud cover, plus temperature, humidity and height on seven pressure
+   levels from sea level to ~2000m.
 2. **Vertical structure.** From that profile, find where the air reaches saturation (the
-   cloud base) and where it dries out again (the cloud top).
+   cloud base) and where it dries out again (the cloud top). If low cloud cover is under
+   `cloudCover.minLow`, the hour is treated as cloudless and nothing is painted, however
+   humid the profile looks.
 3. **Terrain.** A 50m elevation grid per island, resampled from the Copernicus GLO-30 DEM.
 4. **Intersect.** For each cell, compare its elevation with the cloud layer. Below the base
    is clear, inside it is fog that thickens with depth, above the top is clear again. That
@@ -99,12 +101,16 @@ fog model and the class colors exist once rather than twice.
 
 ## Limitations
 
-- **It predicts the height range a cloud would occupy, not whether there is a cloud.** The
-  profile always yields a base and a top, and every land cell between them is painted as fog.
-  Nothing in the pipeline ever establishes that cloud actually exists over that island at that
-  hour. On a humid but cloudless day the numbers still produce a base a few hundred meters up,
-  so the high ground is shown as fogged under a clear sky, and the app has no way to tell that
-  case apart from a real deck. This is the single largest source of false fog.
+- **Cloud presence is a single number for the whole island.** The profile always yields a base
+  and a top, so `cloud_cover_low` is what decides whether any of it gets painted. That figure
+  is one percentage sampled at the island center for the whole 0–3km column: it says some low
+  cloud exists nearby, not that it sits at the modeled base, and not which part of the island
+  is under it. Above the threshold the entire island is painted, below it none of it is, so an
+  hour at 39% cover shows nothing and an hour at 40% shows everything. Partial cover is the
+  common case here and it is not rendered as partial.
+- **The pressure levels cannot resolve a low cloud base.** The lowest two are ~110m and ~320m,
+  and Azorean stratus routinely sits between them. Any base in that band is a straight-line
+  interpolation across a 210m gap, and below 110m the model can only fall back to the LCL.
 - **The model is not validated.** Every constant in `config/model.json` is either standard
   physics or a plausible value chosen by hand and checked against a single day of output.
   Nothing has been compared against observed fog. It is a physically reasoned estimate, not a

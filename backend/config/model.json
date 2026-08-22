@@ -4,6 +4,7 @@
 
   "cloudBase": { "saturationRh": 90, "lclCoefficient": 125 },
   "cloudTop": { "exitRh": 85, "maxThickness": 1500 },
+  "cloudCover": { "minLow": 40 },
   "windward": {
     "aspectTolerance": 60,
     "minSlope": 5,

@@ -16,6 +16,7 @@ const SURFACE = [
   "dew_point_2m",
   "wind_speed_10m",
   "wind_direction_10m",
+  "cloud_cover_low",
 ];
 
 const LEVELS = [1000, 975, 950, 925, 900, 850, 800];

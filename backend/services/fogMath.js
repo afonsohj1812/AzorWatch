@@ -108,6 +108,7 @@ export function createFogMath(config) {
     return {
       base,
       top: cloudTopHeight(profile, base),
+      cover: surface.cloud_cover_low[hour],
       orangeDepth: depthForVisibility(config.classThresholds.orange),
       redDepth: depthForVisibility(config.classThresholds.red),
       windDirection: surface.wind_direction_10m[hour],
@@ -140,8 +141,12 @@ export function createFogMath(config) {
     return c.base - windwardLowering(aspectByte * 2, slopeDegrees, c);
   }
 
+  function hasCloud(c) {
+    return c.cover == null || c.cover >= config.cloudCover.minLow;
+  }
+
   function classifyCell(z, base, c) {
-    if (z === OCEAN || z > c.top) return FOG_CLASS.NONE;
+    if (!hasCloud(c) || z > c.top) return FOG_CLASS.NONE;
 
     const depth = z - base;
     if (depth >= 0) {
@@ -171,6 +176,7 @@ export function createFogMath(config) {
 
   return {
     hourConditions,
+    hasCloud,
     localBase,
     classifyCell,
     classifyHour,

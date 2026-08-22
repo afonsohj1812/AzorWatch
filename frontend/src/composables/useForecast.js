@@ -12,6 +12,7 @@ import {
 import { createFogMath, FOG_CLASS_NAMES, OCEAN } from "../services/fogMath";
 
 const DEFAULT_ISLAND = "terceira";
+const PIPELINE_LAG_MS = 90_000;
 
 const demCache = new Map();
 
@@ -60,17 +61,17 @@ export function useForecast() {
   const hourIndex = ref(nowHour.value);
   const now = ref(Date.now());
 
-  const ticker = setInterval(async () => {
+  let refreshTimer = null;
+
+  const ticker = setInterval(() => {
     now.value = Date.now();
     nowHour.value = azoresHour();
-
-    try {
-      forecast.value = await load(forecastUrl(islandId.value));
-    } catch (err) {
-      console.error(err);
-    }
   }, 60_000);
-  onScopeDispose(() => clearInterval(ticker));
+
+  onScopeDispose(() => {
+    clearInterval(ticker);
+    clearTimeout(refreshTimer);
+  });
 
   async function load(url) {
     const res = await fetch(url);
@@ -87,6 +88,14 @@ export function useForecast() {
     }
   }
 
+  async function refreshForecast() {
+    try {
+      forecast.value = await load(forecastUrl(islandId.value));
+    } catch (err) {
+      console.error(err);
+    }
+  }
+
   load(islandsUrl())
     .then((list) => {
       islands.value = list;
@@ -94,6 +103,11 @@ export function useForecast() {
     .catch(console.error);
 
   watch(islandId, loadForecast, { immediate: true });
+
+  watch(nowHour, () => {
+    clearTimeout(refreshTimer);
+    refreshTimer = setTimeout(refreshForecast, PIPELINE_LAG_MS);
+  });
 
   const island = computed(
     () => islands.value.find((i) => i.id === islandId.value) ?? null,
@@ -159,6 +173,7 @@ export function useForecast() {
       ...base,
       sea: false,
       class: FOG_CLASS_NAMES[fogClass],
+      cloudy: math.hasCloud(c),
       elevation: z,
       slope: dem.slope[index],
       aspect: dem.aspect[index] * 2,

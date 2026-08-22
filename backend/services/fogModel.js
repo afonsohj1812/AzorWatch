@@ -17,76 +17,16 @@ const PALETTE = FOG_CLASS_NAMES.map(
   (name) => config.classes.find((c) => c.id === name).rgb,
 );
 
-const { hourConditions, localBase, classifyCell, classifyHour, visibilityAt } =
-  math;
+const {
+  hourConditions,
+  hasCloud,
+  localBase,
+  classifyCell,
+  classifyHour,
+  visibilityAt,
+} = math;
 
 const HOURS_PER_DAY = 24;
-
-const bundles = new Map();
-
-export async function getIslandFog(id) {
-  const { runAt, islands: byIsland } = await getForecast();
-  const forecast = byIsland[id];
-  if (!forecast) return null;
-
-  const cached = bundles.get(id);
-  if (cached && cached.runAt === runAt) return cached;
-
-  const dem = await loadDem(id);
-  const hours = forecast.time.length;
-
-  let landCells = 0;
-  for (let i = 0; i < dem.elevation.length; i++)
-    if (dem.elevation[i] !== OCEAN) landCells++;
-
-  const coverage = config.summary.coverage;
-
-  const grids = [];
-  const hourClass = new Uint8Array(hours);
-
-  for (let hour = 0; hour < hours; hour++) {
-    const classes = classifyHour(dem, forecast, hour);
-    grids.push(classes);
-
-    let fogged = 0;
-    for (let i = 0; i < classes.length; i++)
-      if (dem.elevation[i] !== OCEAN && classes[i] !== FOG_CLASS.NONE) fogged++;
-
-    const covered = fogged / landCells;
-    hourClass[hour] =
-      covered >= coverage.red
-        ? FOG_CLASS.RED
-        : covered >= coverage.orange
-          ? FOG_CLASS.ORANGE
-          : covered >= coverage.yellow
-            ? FOG_CLASS.YELLOW
-            : FOG_CLASS.NONE;
-  }
-
-  const days = hours / HOURS_PER_DAY;
-  const dayClass = new Uint8Array(days);
-
-  for (let day = 0; day < days; day++) {
-    const start = day * HOURS_PER_DAY;
-
-    let total = 0;
-    for (let h = start; h < start + HOURS_PER_DAY; h++) total += hourClass[h];
-
-    dayClass[day] = Math.floor(total / HOURS_PER_DAY);
-  }
-
-  const bundle = {
-    runAt,
-    time: forecast.time,
-    width: dem.width,
-    height: dem.height,
-    grids,
-    hourClass,
-    dayClass,
-  };
-  bundles.set(id, bundle);
-  return bundle;
-}
 
 const asUtc = (date) => new Date(`${date}T00:00:00Z`);
 const dayLabel = (date) =>
@@ -101,47 +41,89 @@ const weekday = (date) =>
     timeZone: "UTC",
   });
 
-export async function getIslandSummary(id) {
-  const { islands: byIsland } = await getForecast();
+function renderOverlay(classes, width, height) {
+  const png = new PNG({ width, height });
+
+  for (let i = 0; i < classes.length; i++) {
+    const [r, g, b, a] = PALETTE[classes[i]];
+    const p = i * 4;
+    png.data[p] = r;
+    png.data[p + 1] = g;
+    png.data[p + 2] = b;
+    png.data[p + 3] = a;
+  }
+
+  return PNG.sync.write(png);
+}
+
+export async function buildForecast(id, onOverlay) {
+  const { runAt, islands: byIsland } = await getForecast();
   const forecast = byIsland[id];
   if (!forecast) return null;
 
-  const fog = await getIslandFog(id);
-  const days = [];
+  const dem = await loadDem(id);
+  const hours = forecast.time.length;
 
-  for (let day = 0; day < fog.dayClass.length; day++) {
+  let landCells = 0;
+  for (let i = 0; i < dem.elevation.length; i++)
+    if (dem.elevation[i] !== OCEAN) landCells++;
+
+  const coverage = config.summary.coverage;
+  const hourClass = new Uint8Array(hours);
+
+  for (let hour = 0; hour < hours; hour++) {
+    const classes = classifyHour(dem, forecast, hour);
+
+    let fogged = 0;
+    for (let i = 0; i < classes.length; i++)
+      if (dem.elevation[i] !== OCEAN && classes[i] !== FOG_CLASS.NONE) fogged++;
+
+    const covered = fogged / landCells;
+    hourClass[hour] =
+      covered >= coverage.red
+        ? FOG_CLASS.RED
+        : covered >= coverage.orange
+          ? FOG_CLASS.ORANGE
+          : covered >= coverage.yellow
+            ? FOG_CLASS.YELLOW
+            : FOG_CLASS.NONE;
+
+    if (onOverlay)
+      await onOverlay({
+        time: forecast.time[hour],
+        etag: `"${runAt}:${id}:${hour}"`,
+        png: renderOverlay(classes, dem.width, dem.height),
+      });
+  }
+
+  const days = [];
+  for (let day = 0; day < hours / HOURS_PER_DAY; day++) {
     const start = day * HOURS_PER_DAY;
-    const date = fog.time[start].slice(0, 10);
+    const date = forecast.time[start].slice(0, 10);
+
+    let total = 0;
+    for (let h = start; h < start + HOURS_PER_DAY; h++) total += hourClass[h];
 
     days.push({
       date,
       label: dayLabel(date),
       weekday: weekday(date),
-      fogClass: FOG_CLASS_NAMES[fog.dayClass[day]],
+      fogClass: FOG_CLASS_NAMES[Math.floor(total / HOURS_PER_DAY)],
       hours: Array.from({ length: HOURS_PER_DAY }, (_, h) => ({
-        time: fog.time[start + h],
-        fogClass: FOG_CLASS_NAMES[fog.hourClass[start + h]],
+        time: forecast.time[start + h],
+        fogClass: FOG_CLASS_NAMES[hourClass[start + h]],
       })),
     });
   }
 
   return {
     island: id,
-    runAt: fog.runAt,
-    width: fog.width,
-    height: fog.height,
+    runAt,
+    width: dem.width,
+    height: dem.height,
+    time: forecast.time,
     days,
-    conditions: fog.time.map((_, hour) => {
-      const c = hourConditions(forecast, hour);
-      return {
-        base: c.base,
-        top: c.top,
-        orangeDepth: c.orangeDepth,
-        redDepth: c.redDepth,
-        windDirection: c.windDirection,
-        windSpeed: c.windSpeed,
-      };
-    }),
+    conditions: forecast.time.map((_, hour) => hourConditions(forecast, hour)),
   };
 }
 
@@ -162,6 +144,7 @@ export function inspectCell(dem, c, time, x, y) {
     y,
     sea: false,
     class: FOG_CLASS_NAMES[fogClass],
+    cloudy: hasCloud(c),
     elevation: z,
     slope: dem.slope[index],
     aspect: dem.aspect[index] * 2,
@@ -173,25 +156,6 @@ export function inspectCell(dem, c, time, x, y) {
   };
 }
 
-export function renderOverlay(fog, id, hour) {
-  const classes = fog.grids[hour];
-  const png = new PNG({ width: fog.width, height: fog.height });
-
-  for (let i = 0; i < classes.length; i++) {
-    const [r, g, b, a] = PALETTE[classes[i]];
-    const p = i * 4;
-    png.data[p] = r;
-    png.data[p + 1] = g;
-    png.data[p + 2] = b;
-    png.data[p + 3] = a;
-  }
-
-  return {
-    buffer: PNG.sync.write(png),
-    etag: `"${fog.runAt}:${id}:${hour}"`,
-  };
-}
-
 let running = false;
 
 export async function runPipeline() {
@@ -199,24 +163,17 @@ export async function runPipeline() {
     return console.log("Pipeline: previous run still going, skipped");
 
   running = true;
-  const storedAt = new Date(Date.now()).toISOString();
+  const storedAt = new Date().toISOString();
 
-  let bytes = 0;
   try {
     for (const island of islands) {
-      const summary = await getIslandSummary(island.id);
-      const fog = await getIslandFog(island.id);
+      const items = [];
+      const summary = await buildForecast(island.id, (overlay) =>
+        items.push(overlay),
+      );
 
-      await saveForecast(island.id, { ...summary, storedAt, time: fog.time });
-
-      const items = fog.time.map((time, hour) => {
-        const overlay = renderOverlay(fog, island.id, hour);
-        bytes += overlay.buffer.length;
-
-        return { time, etag: overlay.etag, png: overlay.buffer };
-      });
-
-      await saveOverlays(island.id, fog.runAt, items);
+      await saveForecast(island.id, { ...summary, storedAt });
+      await saveOverlays(island.id, summary.runAt, items);
     }
   } finally {
     running = false;

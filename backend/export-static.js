@@ -1,11 +1,7 @@
 import { mkdir, writeFile, copyFile, readdir } from "node:fs/promises";
 
 import { islands } from "./config/islands.js";
-import {
-  getIslandFog,
-  getIslandSummary,
-  renderOverlay,
-} from "./services/fogModel.js";
+import { buildForecast } from "./services/fogModel.js";
 
 const OUT = "dist-api";
 const DEM_DIR = "data/dem";
@@ -22,28 +18,31 @@ async function main() {
   let bytes = 0;
 
   for (const island of islands) {
-    const summary = await getIslandSummary(island.id);
+    await mkdir(`${OUT}/fog/${island.id}`, { recursive: true });
+
+    let islandBytes = 0;
+    let hours = 0;
+
+    const { time, ...summary } = await buildForecast(
+      island.id,
+      async (overlay) => {
+        await writeFile(
+          `${OUT}/fog/${island.id}/${overlay.time}.png`,
+          overlay.png,
+        );
+        islandBytes += overlay.png.length;
+        hours++;
+      },
+    );
+
     await writeFile(
       `${OUT}/forecast/${island.id}.json`,
       JSON.stringify({ ...summary, storedAt }),
     );
 
-    const fog = await getIslandFog(island.id);
-    await mkdir(`${OUT}/fog/${island.id}`, { recursive: true });
-
-    let islandBytes = 0;
-    for (let hour = 0; hour < fog.time.length; hour++) {
-      const overlay = renderOverlay(fog, island.id, hour);
-      await writeFile(
-        `${OUT}/fog/${island.id}/${fog.time[hour]}.png`,
-        overlay.buffer,
-      );
-      islandBytes += overlay.buffer.length;
-    }
-
     bytes += islandBytes;
     console.log(
-      `  ${island.id.padEnd(12)} ${fog.time.length} hours  ${(islandBytes / 1024).toFixed(0)} KB`,
+      `  ${island.id.padEnd(12)} ${hours} hours  ${(islandBytes / 1024).toFixed(0)} KB`,
     );
   }
 
