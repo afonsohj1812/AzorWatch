@@ -16,6 +16,7 @@ const PALETTE = SEA_CLASS_NAMES.map(
   (name) => config.sea.classes.find((c) => c.id === name).rgb,
 );
 
+const LAYER_NAMES = Object.keys(config.sea.layers);
 const BAND_CELLS = Math.round(config.sea.bandMeters / config.cellSize);
 const NEIGHBORS = config.sea.neighbors;
 const IDW_EXPONENT = -config.sea.idwPower / 2;
@@ -110,6 +111,62 @@ function renderOverlay(png, cells, classes) {
   return PNG.sync.write(png);
 }
 
+const round = (value, places) =>
+  Number.isFinite(value) ? Number(value.toFixed(places)) : null;
+
+function findCell(cells, target) {
+  let low = 0;
+  let high = cells.length - 1;
+
+  while (low <= high) {
+    const mid = (low + high) >> 1;
+    if (cells[mid] === target) return mid;
+    if (cells[mid] < target) low = mid + 1;
+    else high = mid - 1;
+  }
+
+  return -1;
+}
+
+export function inspectSeaCell(dem, summary, hour, time, x, y) {
+  if (x < 0 || y < 0 || x >= dem.width || y >= dem.height) return null;
+
+  const blend = blendFor(summary.island, dem, summary.points);
+  const j = findCell(blend.cells, y * dem.width + x);
+  if (j === -1) return { time, x, y, offshore: true };
+
+  const base = j * blend.k;
+  const layers = {};
+
+  for (const name of LAYER_NAMES) {
+    let value = 0;
+    let weight = 0;
+
+    for (let n = 0; n < blend.k; n++) {
+      const reading = summary.points[blend.indices[base + n]].layers[name][hour];
+      if (reading === null) continue;
+      value += reading * blend.weights[base + n];
+      weight += blend.weights[base + n];
+    }
+
+    layers[name] = weight ? round(value / weight, 2) : null;
+  }
+
+  let score = 0;
+  for (let n = 0; n < blend.k; n++)
+    score += summary.points[blend.indices[base + n]].score[hour] * blend.weights[base + n];
+
+  return {
+    time,
+    x,
+    y,
+    offshore: false,
+    class: SEA_CLASS_NAMES[math.classify(score)],
+    score: round(score, 3),
+    layers,
+  };
+}
+
 function percentileClass(counts, total) {
   const target = PERCENTILE * total;
   let seen = 0;
@@ -139,10 +196,26 @@ export async function buildSeaForecast(id, onOverlay) {
   const png = new PNG({ width: dem.width, height: dem.height });
   png.data.fill(0);
 
+  const summaryPoints = points.map((point) => ({
+    lat: point.lat,
+    lon: point.lon,
+    score: new Array(hours),
+    layers: Object.fromEntries(
+      LAYER_NAMES.map((name) => [name, new Array(hours)]),
+    ),
+  }));
+
   for (let hour = 0; hour < hours; hour++) {
     const index = marine.historyHours + hour;
-    for (let p = 0; p < points.length; p++)
+
+    for (let p = 0; p < points.length; p++) {
       scores[p] = math.score(points[p], index) ?? 1;
+      summaryPoints[p].score[hour] = round(scores[p], 3);
+
+      const values = math.layerValues(points[p], index);
+      for (const name of LAYER_NAMES)
+        summaryPoints[p].layers[name][hour] = round(values[name], 2);
+    }
 
     const counts = new Int32Array(SEA_CLASS_NAMES.length);
 
@@ -195,5 +268,6 @@ export async function buildSeaForecast(id, onOverlay) {
     time: marine.time.slice(marine.historyHours),
     bandCells: cells.length,
     days,
+    points: summaryPoints,
   };
 }

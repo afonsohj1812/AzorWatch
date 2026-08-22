@@ -2,11 +2,9 @@ import { readFileSync } from "node:fs";
 import { PNG } from "pngjs";
 
 import { createFogMath, FOG_CLASS, FOG_CLASS_NAMES, OCEAN } from "./fogMath.js";
-import { islands } from "../config/islands.js";
 import { loadDem } from "./dem.js";
 import { dayLabel, weekday } from "./dates.js";
 import { getForecast } from "./forecast.js";
-import { saveForecast, saveOverlays } from "./db.js";
 
 const config = JSON.parse(
   readFileSync(new URL("../config/model.json", import.meta.url)),
@@ -144,26 +142,3 @@ export function inspectCell(dem, c, time, x, y) {
   };
 }
 
-let running = false;
-
-export async function runPipeline() {
-  if (running)
-    return console.log("Pipeline: previous run still going, skipped");
-
-  running = true;
-  const storedAt = new Date().toISOString();
-
-  try {
-    for (const island of islands) {
-      const items = [];
-      const summary = await buildForecast(island.id, (overlay) =>
-        items.push(overlay),
-      );
-
-      await saveForecast(island.id, { ...summary, storedAt });
-      await saveOverlays(island.id, summary.runAt, items);
-    }
-  } finally {
-    running = false;
-  }
-}
