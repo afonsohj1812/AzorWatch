@@ -10,11 +10,13 @@ import {
   configUrl,
 } from "../api";
 import { createFogMath, FOG_CLASS_NAMES, OCEAN } from "../services/fogMath";
+import { createSeaMath, nearestPoints, SEA_CLASS_NAMES } from "../services/seaMath";
 import {
-  createSeaMath,
-  nearestPoints,
-  SEA_CLASS_NAMES,
-} from "../services/seaMath";
+  FOG_ELEVATION,
+  OVERALL,
+  isSurfaceLayer,
+  renderLayer,
+} from "../layers";
 
 const DEFAULT_ISLAND = "terceira";
 const DEFAULT_MODE = "fog";
@@ -64,6 +66,7 @@ export function useForecast() {
   const islands = ref([]);
   const islandId = ref(DEFAULT_ISLAND);
   const mode = ref(DEFAULT_MODE);
+  const layer = ref(OVERALL);
   const loadedMode = ref(DEFAULT_MODE);
   const forecast = ref(null);
   const dayIndex = ref(0);
@@ -135,13 +138,18 @@ export function useForecast() {
 
   const ready = computed(() => loadedMode.value === mode.value);
 
+  const classOf = (entry) =>
+    mode.value === "sea" && layer.value !== OVERALL
+      ? entry.layerClass?.[layer.value]
+      : entry[classKey.value];
+
   const days = computed(() =>
     (ready.value ? (forecast.value?.days ?? []) : []).map((day) => ({
       ...day,
-      class: day[classKey.value],
+      class: classOf(day),
       hours: day.hours.map((hour) => ({
         ...hour,
-        class: hour[classKey.value],
+        class: classOf(hour),
       })),
     })),
   );
@@ -151,14 +159,79 @@ export function useForecast() {
   const hour = computed(() => hours.value[hourIndex.value] ?? null);
 
   const overlayFor = (time) => overlayUrl(mode.value, islandId.value, time);
-  const currentOverlay = computed(() =>
+
+  const showingElevation = computed(
+    () => mode.value === "fog" && layer.value === FOG_ELEVATION,
+  );
+
+  const hourlyOverlay = computed(() =>
     hour.value ? overlayFor(hour.value.time) : null,
   );
 
+  const currentOverlay = computed(() =>
+    showingElevation.value ? overlayFor(FOG_ELEVATION) : hourlyOverlay.value,
+  );
+
+  const layerOverlay = ref(null);
+  const showingLayer = computed(
+    () =>
+      (mode.value === "sea" && layer.value !== OVERALL) ||
+      isSurfaceLayer(layer.value),
+  );
+
+  const maskUrl = computed(() =>
+    isSurfaceLayer(layer.value)
+      ? overlayFor("land")
+      : hourlyOverlay.value,
+  );
+
+  let layerToken = 0;
+
+  function releaseLayer() {
+    if (layerOverlay.value) URL.revokeObjectURL(layerOverlay.value);
+    layerOverlay.value = null;
+  }
+
+  watch(
+    [showingLayer, layer, islandId, hourIndex, dayIndex, forecast],
+    async () => {
+      const token = ++layerToken;
+
+      if (!showingLayer.value || !island.value || !hour.value || !ready.value)
+        return releaseLayer();
+
+      const url = await renderLayer({
+        id: islandId.value,
+        bbox: island.value.bbox,
+        points: forecast.value.points,
+        layer: layer.value,
+        hour: dayIndex.value * HOURS_PER_DAY + hourIndex.value,
+        maskUrl: maskUrl.value,
+      }).catch(() => null);
+
+      if (token !== layerToken) {
+        if (url) URL.revokeObjectURL(url);
+        return;
+      }
+
+      releaseLayer();
+      layerOverlay.value = url;
+    },
+    { immediate: true },
+  );
+
+  onScopeDispose(releaseLayer);
+
+  const displayedOverlay = computed(() =>
+    showingLayer.value ? layerOverlay.value : currentOverlay.value,
+  );
+
   const prefetchUrls = computed(() =>
-    [hourIndex.value - 1, hourIndex.value + 1]
-      .filter((i) => i >= 0 && i < hours.value.length)
-      .map((i) => overlayFor(hours.value[i].time)),
+    showingLayer.value || showingElevation.value
+      ? []
+      : [hourIndex.value - 1, hourIndex.value + 1]
+          .filter((i) => i >= 0 && i < hours.value.length)
+          .map((i) => overlayFor(hours.value[i].time)),
   );
 
   const updatedLabel = computed(() => {
@@ -333,6 +406,10 @@ export function useForecast() {
     }, wait);
   }
 
+  watch(mode, () => {
+    layer.value = OVERALL;
+  });
+
   watch([mode, islandId], () => {
     point.value = null;
   });
@@ -350,12 +427,13 @@ export function useForecast() {
     islandId,
     island,
     mode,
+    layer,
     days,
     dayIndex,
     hours,
     hourIndex,
     nowHour,
-    overlayUrl: currentOverlay,
+    overlayUrl: displayedOverlay,
     prefetchUrls,
     updatedLabel,
   };

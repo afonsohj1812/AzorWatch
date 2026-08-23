@@ -80,6 +80,30 @@
 
   "classThresholds": { "yellow": 10000, "orange": 1000, "red": 100 },
   "summary": { "coverage": { "yellow": 0.25, "orange": 0.5, "red": 0.75 } },
+  "surface": {
+    "sampleGridDegrees": 0.0703125,
+    "ramp": [
+      { "color": "#5f9fff", "rgb": [95, 159, 255, 140] },
+      { "color": "#5fdfcf", "rgb": [95, 223, 207, 140] },
+      { "color": "#ffdf5f", "rgb": [255, 223, 95, 140] },
+      { "color": "#ff6f4f", "rgb": [255, 111, 79, 140] }
+    ],
+    "elevation": {
+      "label": "Elevation",
+      "unit": "m",
+      "min": 0,
+      "max": 2400
+    },
+    "layers": {
+      "cloudCover": {
+        "source": "cloud_cover_low",
+        "label": "Cloud",
+        "unit": "%",
+        "min": 0,
+        "max": 100
+      }
+    }
+  },
 
   "classes": [
     {

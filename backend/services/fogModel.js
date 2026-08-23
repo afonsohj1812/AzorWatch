@@ -5,6 +5,7 @@ import { createFogMath, FOG_CLASS, FOG_CLASS_NAMES, OCEAN } from "./fogMath.js";
 import { loadDem } from "./dem.js";
 import { dayLabel, weekday } from "./dates.js";
 import { getForecast } from "./forecast.js";
+import { getSurface } from "./surface.js";
 
 const config = JSON.parse(
   readFileSync(new URL("../config/model.json", import.meta.url)),
@@ -42,6 +43,45 @@ function renderOverlay(classes, width, height) {
   return PNG.sync.write(png);
 }
 
+const SURFACE_SOURCES = Object.values(config.surface.layers).map(
+  (layer) => layer.source,
+);
+
+function landMask(dem) {
+  const classes = new Uint8Array(dem.elevation.length);
+  for (let i = 0; i < dem.elevation.length; i++)
+    classes[i] = dem.elevation[i] === OCEAN ? FOG_CLASS.NONE : FOG_CLASS.YELLOW;
+  return classes;
+}
+
+const RAMP = config.surface.ramp.map((entry) => entry.rgb);
+
+function renderElevation(dem) {
+  const spec = config.surface.elevation;
+  const span = spec.max - spec.min;
+  const png = new PNG({ width: dem.width, height: dem.height });
+  png.data.fill(0);
+
+  for (let i = 0; i < dem.elevation.length; i++) {
+    if (dem.elevation[i] === OCEAN) continue;
+
+    const fraction = span === 0 ? 0 : (dem.elevation[i] - spec.min) / span;
+    const bin = Math.min(
+      RAMP.length - 1,
+      Math.max(0, Math.floor(fraction * RAMP.length)),
+    );
+
+    const [r, g, b, a] = RAMP[bin];
+    const p = i * 4;
+    png.data[p] = r;
+    png.data[p + 1] = g;
+    png.data[p + 2] = b;
+    png.data[p + 3] = a;
+  }
+
+  return PNG.sync.write(png);
+}
+
 export async function buildForecast(id, onOverlay) {
   const { runAt, islands: byIsland } = await getForecast();
   const forecast = byIsland[id];
@@ -54,8 +94,27 @@ export async function buildForecast(id, onOverlay) {
   for (let i = 0; i < dem.elevation.length; i++)
     if (dem.elevation[i] !== OCEAN) landCells++;
 
+  const surface = await getSurface().catch((err) => {
+    console.warn(`surface layers unavailable (${err.message})`);
+    return null;
+  });
+
   const coverage = config.summary.coverage;
   const hourClass = new Uint8Array(hours);
+
+  if (onOverlay) {
+    await onOverlay({
+      time: "land",
+      etag: `"${runAt}:${id}:land"`,
+      png: renderOverlay(landMask(dem), dem.width, dem.height),
+    });
+
+    await onOverlay({
+      time: "elevation",
+      etag: `"${id}:elevation"`,
+      png: renderElevation(dem),
+    });
+  }
 
   for (let hour = 0; hour < hours; hour++) {
     const classes = classifyHour(dem, forecast, hour);
@@ -80,6 +139,7 @@ export async function buildForecast(id, onOverlay) {
         etag: `"${runAt}:${id}:${hour}"`,
         png: renderOverlay(classes, dem.width, dem.height),
       });
+
   }
 
   const days = [];
@@ -110,6 +170,12 @@ export async function buildForecast(id, onOverlay) {
     time: forecast.time,
     days,
     conditions: forecast.time.map((_, hour) => hourConditions(forecast, hour)),
+    points: (surface?.islands[id] ?? []).map((point) => ({
+      lat: point.lat,
+      lon: point.lon,
+      elevation: point.elevation,
+      ...Object.fromEntries(SURFACE_SOURCES.map((k) => [k, point[k]])),
+    })),
   };
 }
 

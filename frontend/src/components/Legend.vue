@@ -1,15 +1,17 @@
 <script setup>
 import { computed, ref } from "vue";
 
-import { paletteFor } from "../palette";
+import { legendFor } from "../palette";
 
 const props = defineProps({
   collapsible: { type: Boolean, default: false },
   mode: { type: String, default: "fog" },
+  layer: { type: String, default: "overall" },
 });
 
-const entries = computed(() => paletteFor(props.mode));
-const title = computed(() => (props.mode === "sea" ? "CONDITIONS" : "VISIBILITY"));
+const descriptor = computed(() => legendFor(props.mode, props.layer));
+const entries = computed(() => descriptor.value.entries);
+const title = computed(() => descriptor.value.title);
 
 const open = ref(false);
 </script>

@@ -26,10 +26,23 @@ export async function runPipeline() {
   running = true;
   const storedAt = new Date().toISOString();
 
+  const failed = new Set();
+
   try {
-    for (const island of islands)
-      for (const [kind, build] of MODELS)
-        await store(kind, build, island.id, storedAt);
+    for (const island of islands) {
+      for (const [kind, build] of MODELS) {
+        if (failed.has(kind)) continue;
+
+        try {
+          await store(kind, build, island.id, storedAt);
+        } catch (err) {
+          failed.add(kind);
+          console.error(
+            `Pipeline: ${kind} failed (${err.message}), skipping it for the rest of this run`,
+          );
+        }
+      }
+    }
   } finally {
     running = false;
   }

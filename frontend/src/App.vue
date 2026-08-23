@@ -5,17 +5,20 @@ import MapView from "./components/MapView.vue";
 import DayPicker from "./components/DayPicker.vue";
 import IslandPicker from "./components/IslandPicker.vue";
 import ModeSwitch from "./components/ModeSwitch.vue";
+import LayerPicker from "./components/LayerPicker.vue";
 import HourSlider from "./components/HourSlider.vue";
 import Legend from "./components/Legend.vue";
 import PointInfo from "./components/PointInfo.vue";
 import { useForecast } from "./composables/useForecast";
 import { useMobile } from "./composables/useMobile";
+import { layersFor } from "./layers";
 
 const {
   islands,
   islandId,
   island,
   mode,
+  layer,
   days,
   dayIndex,
   hours,
@@ -31,6 +34,8 @@ const {
 
 const viewReset = ref(0);
 const isMobile = useMobile();
+
+const layerEntries = computed(() => layersFor(mode.value));
 
 const currentHour = computed(() =>
   dayIndex.value === 0 ? nowHour.value : null,
@@ -54,6 +59,9 @@ const currentHour = computed(() =>
     <div class="panel panel--mode">
       <ModeSwitch v-model="mode" />
     </div>
+    <div class="panel panel--layers">
+      <LayerPicker v-model="layer" :entries="layerEntries" />
+    </div>
     <div class="panel panel--left">
       <IslandPicker
         v-model="islandId"
@@ -74,7 +82,7 @@ const currentHour = computed(() =>
       />
     </div>
     <div class="panel panel--bottom-right">
-      <Legend :collapsible="isMobile" :mode="mode" />
+      <Legend :collapsible="isMobile" :mode="mode" :layer="layer" />
     </div>
 
     <p class="panel credits">
@@ -106,6 +114,12 @@ const currentHour = computed(() =>
 .panel--mode {
   top: 1rem;
   left: 1rem;
+}
+
+.panel--layers {
+  top: 6.5rem;
+  left: 50%;
+  transform: translateX(-50%);
 }
 
 .panel--left {
@@ -165,6 +179,13 @@ const currentHour = computed(() =>
     left: 0.5rem;
   }
 
+  .panel--layers {
+    top: 8.75rem;
+    left: 0.5rem;
+    right: 0.5rem;
+    transform: none;
+  }
+
   .panel--left {
     top: auto;
     bottom: 6rem;
@@ -173,7 +194,7 @@ const currentHour = computed(() =>
   }
 
   .panel--right {
-    top: 6rem;
+    top: 11.5rem;
     right: 0.5rem;
     transform: none;
   }

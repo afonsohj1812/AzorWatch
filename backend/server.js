@@ -132,5 +132,5 @@ app.listen(port, () => {
   console.log(`AzorWatch backend listening on :${port}`);
 });
 
-await runPipeline();
+await runPipeline().catch(console.error);
 cron.schedule("0 * * * *", () => runPipeline().catch(console.error));

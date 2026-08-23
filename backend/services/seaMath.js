@@ -42,10 +42,10 @@ export function nearestPoints(lat, lon, points, count, power) {
 export function createSeaMath(config) {
   const { layers, turbidity, classThresholds } = config.sea;
 
-  function normalize(value, perfect, unusable) {
+  function normalize(value, perfect, undivable) {
     if (!Number.isFinite(value)) return null;
 
-    const span = unusable - perfect;
+    const span = undivable - perfect;
     if (span === 0) return 0;
 
     return Math.min(1, Math.max(0, (value - perfect) / span));
@@ -119,7 +119,7 @@ export function createSeaMath(config) {
     const scores = {};
 
     for (const [name, spec] of Object.entries(layers))
-      scores[name] = normalize(values[name], spec.perfect, spec.unusable);
+      scores[name] = normalize(values[name], spec.perfect, spec.undivable);
 
     return scores;
   }

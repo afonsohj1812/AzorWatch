@@ -17,6 +17,7 @@ const PALETTE = SEA_CLASS_NAMES.map(
 );
 
 const LAYER_NAMES = ["visibility", ...Object.keys(LAYER_SOURCES)];
+const SCORED_LAYERS = Object.entries(config.sea.layers);
 const BAND_CELLS = Math.round(config.sea.bandMeters / config.cellSize);
 const NEIGHBORS = config.sea.neighbors;
 const IDW_EXPONENT = -config.sea.idwPower / 2;
@@ -207,6 +208,10 @@ export async function buildSeaForecast(id, onOverlay) {
     ),
   }));
 
+  const readings = SCORED_LAYERS.map(() => new Float64Array(points.length));
+  const present = SCORED_LAYERS.map(() => new Uint8Array(points.length));
+  const layerHourClass = SCORED_LAYERS.map(() => new Uint8Array(hours));
+
   for (let hour = 0; hour < hours; hour++) {
     const index = marine.historyHours + hour;
 
@@ -217,9 +222,18 @@ export async function buildSeaForecast(id, onOverlay) {
       const values = math.layerValues(points[p], index);
       for (const name of LAYER_NAMES)
         summaryPoints[p].layers[name][hour] = round(values[name], 2);
+
+      SCORED_LAYERS.forEach(([name], li) => {
+        const reading = values[name];
+        present[li][p] = Number.isFinite(reading) ? 1 : 0;
+        readings[li][p] = Number.isFinite(reading) ? reading : 0;
+      });
     }
 
     const counts = new Int32Array(SEA_CLASS_NAMES.length);
+    const layerCounts = SCORED_LAYERS.map(() =>
+      new Int32Array(SEA_CLASS_NAMES.length),
+    );
 
     for (let j = 0; j < cells.length; j++) {
       const base = j * k;
@@ -230,9 +244,35 @@ export async function buildSeaForecast(id, onOverlay) {
       const seaClass = math.classify(value);
       classes[j] = seaClass;
       counts[seaClass]++;
+
+      for (let li = 0; li < SCORED_LAYERS.length; li++) {
+        let blended = 0;
+        let weight = 0;
+
+        for (let n = 0; n < k; n++) {
+          const p = indices[base + n];
+          if (!present[li][p]) continue;
+          blended += readings[li][p] * weights[base + n];
+          weight += weights[base + n];
+        }
+        if (!weight) continue;
+
+        const [, spec] = SCORED_LAYERS[li];
+        const normalized = math.normalize(
+          blended / weight,
+          spec.perfect,
+          spec.undivable,
+        );
+        layerCounts[li][math.classify(normalized)]++;
+      }
     }
 
     hourClass[hour] = percentileClass(counts, cells.length);
+    for (let li = 0; li < SCORED_LAYERS.length; li++)
+      layerHourClass[li][hour] = percentileClass(
+        layerCounts[li],
+        cells.length,
+      );
 
     if (onOverlay)
       await onOverlay({
@@ -242,22 +282,37 @@ export async function buildSeaForecast(id, onOverlay) {
       });
   }
 
+  const dayClassOf = (series, start) => {
+    const slice = Array.from(series.slice(start, start + HOURS_PER_DAY));
+    slice.sort((a, b) => a - b);
+    return SEA_CLASS_NAMES[slice[Math.floor(PERCENTILE * (slice.length - 1))]];
+  };
+
   const days = [];
   for (let day = 0; day < hours / HOURS_PER_DAY; day++) {
     const start = day * HOURS_PER_DAY;
-    const slice = Array.from(hourClass.slice(start, start + HOURS_PER_DAY));
     const date = marine.time[marine.historyHours + start].slice(0, 10);
-
-    slice.sort((a, b) => a - b);
 
     days.push({
       date,
       label: dayLabel(date),
       weekday: weekday(date),
-      seaClass: SEA_CLASS_NAMES[slice[Math.floor(PERCENTILE * (slice.length - 1))]],
+      seaClass: dayClassOf(hourClass, start),
+      layerClass: Object.fromEntries(
+        SCORED_LAYERS.map(([name], li) => [
+          name,
+          dayClassOf(layerHourClass[li], start),
+        ]),
+      ),
       hours: Array.from({ length: HOURS_PER_DAY }, (_, h) => ({
         time: marine.time[marine.historyHours + start + h],
         seaClass: SEA_CLASS_NAMES[hourClass[start + h]],
+        layerClass: Object.fromEntries(
+          SCORED_LAYERS.map(([name], li) => [
+            name,
+            SEA_CLASS_NAMES[layerHourClass[li][start + h]],
+          ]),
+        ),
       })),
     });
   }
