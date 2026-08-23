@@ -17,6 +17,7 @@ let map = null;
 let overlay = null;
 let cellOutline = null;
 let hovered = null;
+let moving = false;
 
 function boundsOf(island) {
   const [west, south, east, north] = island.bbox;
@@ -119,6 +120,8 @@ function clearCell() {
 }
 
 function onMapMove(event) {
+  if (moving) return;
+
   const cell = cellAt(event.latlng);
   if (!cell) return clearCell();
 
@@ -154,6 +157,14 @@ onMounted(async () => {
         "Tiles &copy; Esri — Source: Esri, Maxar, Earthstar Geographics and the GIS User Community",
     },
   ).addTo(map);
+
+  map.on("movestart", () => {
+    moving = true;
+    clearCell();
+  });
+  map.on("moveend", () => {
+    moving = false;
+  });
 
   map.on("mousemove", onMapMove);
   map.on("mouseout", clearCell);

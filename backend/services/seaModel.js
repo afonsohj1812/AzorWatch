@@ -1,7 +1,7 @@
 import { readFileSync } from "node:fs";
 import { PNG } from "pngjs";
 
-import { createSeaMath, SEA_CLASS_NAMES } from "./seaMath.js";
+import { createSeaMath, LAYER_SOURCES, SEA_CLASS_NAMES } from "./seaMath.js";
 import { loadDem } from "./dem.js";
 import { dayLabel, weekday } from "./dates.js";
 import { getMarine } from "./marine.js";
@@ -16,7 +16,7 @@ const PALETTE = SEA_CLASS_NAMES.map(
   (name) => config.sea.classes.find((c) => c.id === name).rgb,
 );
 
-const LAYER_NAMES = Object.keys(config.sea.layers);
+const LAYER_NAMES = ["visibility", ...Object.keys(LAYER_SOURCES)];
 const BAND_CELLS = Math.round(config.sea.bandMeters / config.cellSize);
 const NEIGHBORS = config.sea.neighbors;
 const IDW_EXPONENT = -config.sea.idwPower / 2;
@@ -151,6 +151,8 @@ export function inspectSeaCell(dem, summary, hour, time, x, y) {
 
     layers[name] = weight ? round(value / weight, 2) : null;
   }
+
+  layers.clarity = round(math.clarityMeters(layers.visibility), 1);
 
   let score = 0;
   for (let n = 0; n < blend.k; n++)

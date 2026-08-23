@@ -1,13 +1,12 @@
 <script setup>
 import { ref } from "vue";
 
-import model from "../config/model.json";
-
-const colorOf = (id) => model.classes.find((c) => c.id === id).color;
+import { colorOf } from "../palette";
 
 const props = defineProps({
   days: { type: Array, default: () => [] },
   modelValue: { type: Number, required: true },
+  mode: { type: String, default: "fog" },
 });
 const emit = defineEmits(["update:modelValue"]);
 
@@ -65,7 +64,7 @@ function onPointerUp(event) {
       type="button"
       @click="$emit('update:modelValue', i)"
     >
-      <span class="dot" :style="{ background: colorOf(day.fogClass) }" />
+      <span class="dot" :style="{ background: colorOf(mode, day.class) }" />
       <span class="name">
         <span v-if="i === 0" class="live" />
         {{ i === 0 ? "Today" : day.weekday }}

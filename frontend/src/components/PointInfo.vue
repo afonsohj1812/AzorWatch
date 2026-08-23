@@ -1,16 +1,16 @@
 <script setup>
 import { computed } from "vue";
 
-import model from "../config/model.json";
-
-const FOG_CLASSES = model.classes;
+import { paletteFor } from "../palette";
 
 const props = defineProps({
   point: { type: Object, default: null },
+  mode: { type: String, default: "fog" },
 });
 
-const byId = Object.fromEntries(FOG_CLASSES.map((c) => [c.id, c]));
-const fogClass = computed(() => byId[props.point?.class] ?? null);
+const swatch = computed(
+  () => paletteFor(props.mode).find((c) => c.id === props.point?.class) ?? null,
+);
 
 const metres = (value) => `${Math.round(value).toLocaleString("en-GB")} m`;
 
@@ -23,20 +23,79 @@ const depthText = computed(() => {
     ? `${metres(p.depth)} into the cloud`
     : `${metres(-p.depth)} below the base`;
 });
+
+const FORMAT = {
+  wave: (v) => `${v.toFixed(1)} m`,
+  period: (v) => `${v.toFixed(1)} s`,
+  tide: (v) => `${v > 0 ? "+" : ""}${v.toFixed(2)} m`,
+  current: (v) => `${v.toFixed(1)} km/h`,
+  wind: (v) => `${Math.round(v)} km/h`,
+  gusts: (v) => `${Math.round(v)} km/h`,
+  clarity: (v) => `${Math.round(v)} m`,
+  temperature: (v) => `${v.toFixed(1)} °C`,
+};
+
+const SEA_GROUPS = [
+  { label: "Waves", main: "wave", sub: [["period", "period"]] },
+  { label: "Tide", main: "tide", sub: [["current", "current"]] },
+  { label: "Wind", main: "wind", sub: [["gusts", "gusts"]] },
+  { label: "Clarity", main: "clarity", sub: [] },
+  { label: "Water", main: "temperature", sub: [] },
+];
+
+const seaGroups = computed(() => {
+  const layers = props.point?.layers;
+  if (!layers) return [];
+
+  return SEA_GROUPS.filter((group) => Number.isFinite(layers[group.main])).map(
+    (group) => ({
+      label: group.label,
+      main: FORMAT[group.main](layers[group.main]),
+      sub: group.sub
+        .filter(([, key]) => Number.isFinite(layers[key]))
+        .map(([name, key]) => `${name} ${FORMAT[key](layers[key])}`)
+        .join(" · "),
+    }),
+  );
+});
 </script>
 
 <template>
   <div v-if="point" class="point-info glass">
-    <template v-if="point.sea">
+    <template v-if="mode === 'sea'">
+      <template v-if="point.offshore">
+        <div class="headline">Outside the band</div>
+        <div class="note">Conditions are modeled within 1 km of the coast</div>
+      </template>
+
+      <template v-else>
+        <div class="headline">
+          <span class="swatch" :style="{ background: swatch?.color }" />
+          <span>{{ swatch?.range }}</span>
+        </div>
+
+        <dl class="detail">
+          <template v-for="group in seaGroups" :key="group.label">
+            <dt>{{ group.label }}</dt>
+            <dd>
+              <span>{{ group.main }}</span>
+              <span v-if="group.sub" class="sub">{{ group.sub }}</span>
+            </dd>
+          </template>
+        </dl>
+      </template>
+    </template>
+
+    <template v-else-if="point.sea">
       <div class="headline">Sea</div>
-      <div class="note">No fog modelled over water</div>
+      <div class="note">No fog modeled over water</div>
     </template>
 
     <template v-else>
       <div class="headline">
-        <span class="swatch" :style="{ background: fogClass?.color }" />
+        <span class="swatch" :style="{ background: swatch?.color }" />
         <span>{{
-          point.visibility ? metres(point.visibility) : fogClass?.range
+          point.visibility ? metres(point.visibility) : swatch?.range
         }}</span>
       </div>
 
@@ -66,6 +125,7 @@ const depthText = computed(() => {
   gap: 0.5rem;
   font-weight: bold;
   line-height: 1.5;
+  text-transform: capitalize;
 }
 
 .swatch {
@@ -80,6 +140,7 @@ const depthText = computed(() => {
   font-size: 0.75rem;
   color: rgb(255 255 255 / 0.75);
   line-height: 1.5;
+  max-width: 12rem;
 }
 
 .detail {
@@ -98,6 +159,16 @@ dt {
 }
 
 dd {
+  display: flex;
+  flex-direction: column;
+  align-items: flex-end;
   text-align: right;
+}
+
+.sub {
+  font-size: 0.7rem;
+  line-height: 1.4;
+  color: rgb(255 255 255 / 0.5);
+  white-space: nowrap;
 }
 </style>

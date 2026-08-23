@@ -23,6 +23,7 @@ const MARINE = [
   "swell_wave_period",
   "ocean_current_velocity",
   "sea_surface_temperature",
+  "sea_level_height_msl",
 ];
 
 const WEATHER = ["wind_speed_10m", "wind_gusts_10m", "precipitation"];

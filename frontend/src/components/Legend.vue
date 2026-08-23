@@ -1,13 +1,15 @@
 <script setup>
-import { ref } from "vue";
+import { computed, ref } from "vue";
 
-import model from "../config/model.json";
+import { paletteFor } from "../palette";
 
-const FOG_CLASSES = model.classes;
-
-defineProps({
+const props = defineProps({
   collapsible: { type: Boolean, default: false },
+  mode: { type: String, default: "fog" },
 });
+
+const entries = computed(() => paletteFor(props.mode));
+const title = computed(() => (props.mode === "sea" ? "CONDITIONS" : "VISIBILITY"));
 
 const open = ref(false);
 </script>
@@ -28,10 +30,10 @@ const open = ref(false);
     :class="{ tappable: collapsible }"
     @click="collapsible && (open = false)"
   >
-    <div class="title">VISIBILITY</div>
-    <div v-for="fogClass in FOG_CLASSES" :key="fogClass.id" class="row">
-      <span class="swatch" :style="{ background: fogClass.color }" />
-      <span class="range">{{ fogClass.range }}</span>
+    <div class="title">{{ title }}</div>
+    <div v-for="entry in entries" :key="entry.id" class="row">
+      <span class="swatch" :style="{ background: entry.color }" />
+      <span class="range">{{ entry.range }}</span>
     </div>
   </div>
 </template>

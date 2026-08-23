@@ -1,4 +1,4 @@
-import { mkdir, writeFile, copyFile, readdir } from "node:fs/promises";
+import { mkdir, writeFile, copyFile, readdir, rm } from "node:fs/promises";
 
 import { islands } from "./config/islands.js";
 import { buildForecast } from "./services/fogModel.js";
@@ -28,7 +28,9 @@ async function main() {
     console.log(`\n${model.kind}:`);
 
     for (const island of islands) {
-      await mkdir(`${OUT}/${model.overlays}/${island.id}`, { recursive: true });
+      const dir = `${OUT}/${model.overlays}/${island.id}`;
+      await rm(dir, { recursive: true, force: true });
+      await mkdir(dir, { recursive: true });
 
       let islandBytes = 0;
       let hours = 0;

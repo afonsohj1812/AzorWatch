@@ -1,14 +1,13 @@
 <script setup>
 import { computed, ref } from "vue";
 
-import model from "../config/model.json";
-
-const colorOf = (id) => model.classes.find((c) => c.id === id).color;
+import { colorOf } from "../palette";
 
 const props = defineProps({
   hours: { type: Array, default: () => [] },
   modelValue: { type: Number, required: true },
   currentHour: { type: Number, default: null },
+  mode: { type: String, default: "fog" },
 });
 const emit = defineEmits(["update:modelValue"]);
 
@@ -104,7 +103,7 @@ function onPointerUp(event) {
         :aria-valuemin="0"
         :aria-valuemax="Math.max(0, count - 1)"
         :aria-valuenow="modelValue"
-        :aria-valuetext="`${label}, ${hours[modelValue]?.fogClass ?? 'no data'}`"
+        :aria-valuetext="`${label}, ${hours[modelValue]?.class ?? 'no data'}`"
         @pointerdown="onPointerDown"
         @pointermove="onPointerMove"
         @pointerup="onPointerUp"
@@ -115,7 +114,7 @@ function onPointerUp(event) {
           :key="entry.time"
           class="tick"
           :class="{ active: i === modelValue, now: i === currentHour }"
-          :style="{ background: colorOf(entry.fogClass) }"
+          :style="{ background: colorOf(mode, entry.class) }"
         />
       </div>
     </div>

@@ -6,13 +6,13 @@
     "sampleGridDegrees": 0.0833333,
 
     "layers": {
-      "wave": { "perfect": 0.3, "unusable": 2.0, "weight": 3.0 },
-      "visibility": { "perfect": 0, "unusable": 1, "weight": 2.5 },
-      "current": { "perfect": 0.4, "unusable": 2.2, "weight": 2.0 },
-      "wind": { "perfect": 8, "unusable": 30, "weight": 1.5 },
-      "gusts": { "perfect": 15, "unusable": 45, "weight": 1.0 },
-      "period": { "perfect": 9, "unusable": 4, "weight": 1.0 },
-      "temperature": { "perfect": 21, "unusable": 15, "weight": 0.5 }
+      "wave": { "perfect": 0.3, "undivable": 2.0, "weight": 3.0 },
+      "visibility": { "perfect": 0, "undivable": 1, "weight": 2.5 },
+      "current": { "perfect": 0.4, "undivable": 2.2, "weight": 2.0 },
+      "wind": { "perfect": 8, "undivable": 30, "weight": 1.5 },
+      "gusts": { "perfect": 15, "undivable": 45, "weight": 1.0 },
+      "period": { "perfect": 9, "undivable": 4, "weight": 1.0 },
+      "temperature": { "perfect": 21, "undivable": 15, "weight": 0.5 }
     },
 
     "turbidity": {
@@ -25,7 +25,9 @@
       "runoffHalfLife": 12,
       "runoffWeight": 0.3,
       "rainClear": 0,
-      "rainMurky": 10
+      "rainMurky": 10,
+      "clearMeters": 30,
+      "murkyMeters": 2
     },
 
     "classThresholds": { "green": 0.2, "yellow": 0.4, "orange": 0.6 },
@@ -35,16 +37,10 @@
 
     "classes": [
       {
-        "id": "green",
-        "color": "#3fff9f",
-        "rgb": [63, 255, 159, 127],
-        "range": "excellent"
-      },
-      {
-        "id": "yellow",
-        "color": "#ffff3f",
-        "rgb": [255, 255, 63, 127],
-        "range": "good"
+        "id": "red",
+        "color": "#ff3f3f",
+        "rgb": [255, 63, 63, 127],
+        "range": "undivable"
       },
       {
         "id": "orange",
@@ -53,10 +49,16 @@
         "range": "marginal"
       },
       {
-        "id": "red",
-        "color": "#ff3f3f",
-        "rgb": [255, 63, 63, 127],
-        "range": "unusable"
+        "id": "yellow",
+        "color": "#ffff3f",
+        "rgb": [255, 255, 63, 127],
+        "range": "divable"
+      },
+      {
+        "id": "green",
+        "color": "#3fff9f",
+        "rgb": [63, 255, 159, 127],
+        "range": "perfect"
       }
     ]
   },

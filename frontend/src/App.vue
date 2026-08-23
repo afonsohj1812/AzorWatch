@@ -4,6 +4,7 @@ import { computed, ref } from "vue";
 import MapView from "./components/MapView.vue";
 import DayPicker from "./components/DayPicker.vue";
 import IslandPicker from "./components/IslandPicker.vue";
+import ModeSwitch from "./components/ModeSwitch.vue";
 import HourSlider from "./components/HourSlider.vue";
 import Legend from "./components/Legend.vue";
 import PointInfo from "./components/PointInfo.vue";
@@ -14,6 +15,7 @@ const {
   islands,
   islandId,
   island,
+  mode,
   days,
   dayIndex,
   hours,
@@ -47,7 +49,10 @@ const currentHour = computed(() =>
     />
 
     <div class="panel panel--top">
-      <DayPicker v-model="dayIndex" :days="days" />
+      <DayPicker v-model="dayIndex" :days="days" :mode="mode" />
+    </div>
+    <div class="panel panel--mode">
+      <ModeSwitch v-model="mode" />
     </div>
     <div class="panel panel--left">
       <IslandPicker
@@ -58,17 +63,18 @@ const currentHour = computed(() =>
       />
     </div>
     <div class="panel panel--right">
-      <PointInfo :point="point" />
+      <PointInfo :point="point" :mode="mode" />
     </div>
     <div class="panel panel--bottom">
       <HourSlider
         v-model="hourIndex"
         :hours="hours"
         :current-hour="currentHour"
+        :mode="mode"
       />
     </div>
     <div class="panel panel--bottom-right">
-      <Legend :collapsible="isMobile" />
+      <Legend :collapsible="isMobile" :mode="mode" />
     </div>
 
     <p class="panel credits">
@@ -95,6 +101,11 @@ const currentHour = computed(() =>
   top: 1rem;
   left: 50%;
   transform: translateX(-50%);
+}
+
+.panel--mode {
+  top: 1rem;
+  left: 1rem;
 }
 
 .panel--left {
@@ -147,6 +158,11 @@ const currentHour = computed(() =>
 @media (max-width: 768px) {
   .panel--top {
     top: 0.5rem;
+  }
+
+  .panel--mode {
+    top: 6rem;
+    left: 0.5rem;
   }
 
   .panel--left {

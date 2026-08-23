@@ -9,7 +9,35 @@ export const LAYER_SOURCES = {
   gusts: "wind_gusts_10m",
   period: "swell_wave_period",
   temperature: "sea_surface_temperature",
+  tide: "sea_level_height_msl",
 };
+
+export function nearestPoints(lat, lon, points, count, power) {
+  const scale = Math.cos((lat * Math.PI) / 180);
+
+  const ranked = points
+    .map((point, index) => {
+      const dx = (point.lon - lon) * scale;
+      const dy = point.lat - lat;
+      return { index, distance: dx * dx + dy * dy };
+    })
+    .sort((a, b) => a.distance - b.distance)
+    .slice(0, Math.min(count, points.length));
+
+  if (ranked[0].distance === 0) return [{ index: ranked[0].index, weight: 1 }];
+
+  let total = 0;
+  const weighted = ranked.map(({ index, distance }) => {
+    const weight = Math.pow(distance, -power / 2);
+    total += weight;
+    return { index, weight };
+  });
+
+  return weighted.map(({ index, weight }) => ({
+    index,
+    weight: weight / total,
+  }));
+}
 
 export function createSeaMath(config) {
   const { layers, turbidity, classThresholds } = config.sea;
@@ -70,6 +98,13 @@ export function createSeaMath(config) {
     );
   }
 
+  function clarityMeters(value) {
+    if (!Number.isFinite(value)) return null;
+
+    const { clearMeters, murkyMeters } = turbidity;
+    return clearMeters * Math.pow(murkyMeters / clearMeters, value);
+  }
+
   function layerValues(sample, index) {
     const values = { visibility: turbidityAt(sample, index) };
 
@@ -112,5 +147,13 @@ export function createSeaMath(config) {
     return SEA_CLASS.RED;
   }
 
-  return { normalize, turbidityAt, layerValues, layerScores, score, classify };
+  return {
+    normalize,
+    turbidityAt,
+    clarityMeters,
+    layerValues,
+    layerScores,
+    score,
+    classify,
+  };
 }
