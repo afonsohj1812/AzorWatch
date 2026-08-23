@@ -18,17 +18,31 @@
     "turbidity": {
       "stirHours": 12,
       "stirHalfLife": 6,
-      "stirWeight": 0.7,
+      "stirWeight": 0.45,
       "waveClear": 0.3,
-      "waveMurky": 2.0,
+      "waveMurky": 4.0,
+
+      "chopHours": 8,
+      "chopHalfLife": 4,
+      "chopWeight": 0.2,
+      "chopClear": 0.05,
+      "chopMurky": 0.8,
+
       "runoffHours": 24,
       "runoffHalfLife": 12,
-      "runoffWeight": 0.3,
+      "runoffWeight": 0.2,
       "rainClear": 0,
       "rainMurky": 10,
+
+      "lightWeight": 0.15,
+      "lightClear": 400,
+      "lightMurky": 20,
+
       "clearMeters": 30,
       "murkyMeters": 2
     },
+
+    "shore": { "weight": 0.18, "clearMeters": 600 },
 
     "classThresholds": { "green": 0.2, "yellow": 0.4, "orange": 0.6 },
     "summary": { "percentile": 0.25 },

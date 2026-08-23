@@ -40,7 +40,7 @@ export function nearestPoints(lat, lon, points, count, power) {
 }
 
 export function createSeaMath(config) {
-  const { layers, turbidity, classThresholds } = config.sea;
+  const { layers, turbidity, shore, classThresholds } = config.sea;
 
   function normalize(value, perfect, undivable) {
     if (!Number.isFinite(value)) return null;
@@ -79,6 +79,13 @@ export function createSeaMath(config) {
       turbidity.stirHalfLife,
       true,
     );
+    const chopped = decayed(
+      sample.wind_wave_height,
+      index,
+      turbidity.chopHours,
+      turbidity.chopHalfLife,
+      true,
+    );
     const rained = decayed(
       sample.precipitation,
       index,
@@ -89,13 +96,31 @@ export function createSeaMath(config) {
 
     const stir =
       normalize(stirred, turbidity.waveClear, turbidity.waveMurky) ?? 0;
+    const chop =
+      normalize(chopped, turbidity.chopClear, turbidity.chopMurky) ?? 0;
     const runoff =
       normalize(rained, turbidity.rainClear, turbidity.rainMurky) ?? 0;
+    const gloom =
+      normalize(
+        sample.shortwave_radiation?.[index],
+        turbidity.lightClear,
+        turbidity.lightMurky,
+      ) ?? 0;
 
     return Math.min(
       1,
-      turbidity.stirWeight * stir + turbidity.runoffWeight * runoff,
+      turbidity.stirWeight * stir +
+        turbidity.chopWeight * chop +
+        turbidity.runoffWeight * runoff +
+        turbidity.lightWeight * gloom,
     );
+  }
+
+  function shoreAdjusted(value, coastMeters) {
+    if (!Number.isFinite(value)) return value;
+
+    const near = normalize(coastMeters, shore.clearMeters, 0) ?? 0;
+    return value + (1 - value) * shore.weight * near;
   }
 
   function clarityMeters(value) {
@@ -150,6 +175,7 @@ export function createSeaMath(config) {
   return {
     normalize,
     turbidityAt,
+    shoreAdjusted,
     clarityMeters,
     layerValues,
     layerScores,

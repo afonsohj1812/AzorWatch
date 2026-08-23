@@ -39,7 +39,7 @@ const SEA_GROUPS = [
   { label: "Waves", main: "wave", sub: [["period", "period"]] },
   { label: "Tide", main: "tide", sub: [["current", "current"]] },
   { label: "Wind", main: "wind", sub: [["gusts", "gusts"]] },
-  { label: "Clarity", main: "clarity", sub: [] },
+  { label: "Visibility", main: "clarity", sub: [] },
   { label: "Water", main: "temperature", sub: [] },
 ];
 

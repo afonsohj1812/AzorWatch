@@ -39,7 +39,7 @@ export function rampBin(value, spec) {
 export const SEA_LAYERS = [
   { id: OVERALL, label: "Overall" },
   { id: "wave", label: "Waves" },
-  { id: "visibility", label: "Clarity" },
+  { id: "visibility", label: "Visibility" },
   { id: "period", label: "Period" },
   { id: "current", label: "Current" },
   { id: "wind", label: "Wind" },
@@ -74,13 +74,18 @@ async function maskFor(id, url) {
 
     const { data } = context.getImageData(0, 0, image.width, image.height);
     const pixels = [];
-    for (let i = 0; i < image.width * image.height; i++)
-      if (data[i * 4 + 3] > 0) pixels.push(i);
+    const shore = [];
+    for (let i = 0; i < image.width * image.height; i++) {
+      if (data[i * 4 + 3] === 0) continue;
+      pixels.push(i);
+      shore.push(data[i * 4] * model.cellSize);
+    }
 
     return {
       width: image.width,
       height: image.height,
       pixels: Int32Array.from(pixels),
+      shore: Float32Array.from(shore),
     };
   });
 
@@ -172,11 +177,12 @@ function paint(mask, blend, points, layer, hour) {
     }
     if (!weight) continue;
 
-    const normalized = math.normalize(
-      value / weight,
-      spec.perfect,
-      spec.undivable,
-    );
+    const reading =
+      layer === "visibility"
+        ? math.shoreAdjusted(value / weight, mask.shore[j])
+        : value / weight;
+
+    const normalized = math.normalize(reading, spec.perfect, spec.undivable);
     const [r, g, b, a] = PALETTE[math.classify(normalized)];
 
     const p = mask.pixels[j] * 4;

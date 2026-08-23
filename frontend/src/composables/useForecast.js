@@ -180,9 +180,7 @@ export function useForecast() {
   );
 
   const maskUrl = computed(() =>
-    isSurfaceLayer(layer.value)
-      ? overlayFor("land")
-      : hourlyOverlay.value,
+    isSurfaceLayer(layer.value) ? overlayFor("land") : overlayFor("band"),
   );
 
   let layerToken = 0;
@@ -346,10 +344,26 @@ export function useForecast() {
       layers[name] = weight ? value / weight : null;
     }
 
-    layers.clarity = seaMath.clarityMeters(layers.visibility);
-
     let score = 0;
     for (const { index: p, weight: w } of blend) score += points[p].score[at] * w;
+
+    const open = layers.visibility;
+    if (Number.isFinite(open)) {
+      const specs = Object.values(model.sea.layers);
+      const share =
+        model.sea.layers.visibility.weight /
+        specs.reduce((sum, spec) => sum + spec.weight, 0);
+
+      const adjusted = seaMath.shoreAdjusted(
+        open,
+        dem.coast[index] * model.cellSize,
+      );
+
+      score += share * (adjusted - open);
+      layers.visibility = adjusted;
+    }
+
+    layers.clarity = seaMath.clarityMeters(layers.visibility);
 
     return {
       ...base,

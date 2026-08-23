@@ -18,6 +18,11 @@ const PALETTE = SEA_CLASS_NAMES.map(
 
 const LAYER_NAMES = ["visibility", ...Object.keys(LAYER_SOURCES)];
 const SCORED_LAYERS = Object.entries(config.sea.layers);
+const VISIBILITY_SHARE =
+  config.sea.layers.visibility.weight /
+  SCORED_LAYERS.reduce((sum, [, spec]) => sum + spec.weight, 0);
+const CELL_SIZE = config.cellSize;
+const VISIBILITY_INDEX = SCORED_LAYERS.findIndex(([name]) => name === "visibility");
 const BAND_CELLS = Math.round(config.sea.bandMeters / config.cellSize);
 const NEIGHBORS = config.sea.neighbors;
 const IDW_EXPONENT = -config.sea.idwPower / 2;
@@ -86,7 +91,10 @@ function buildBlend(dem, points) {
     for (let n = 0; n < k; n++) weights[base + n] /= total;
   }
 
-  return { cells: Int32Array.from(cells), indices, weights, k };
+  const shore = new Float32Array(cells.length);
+  for (let j = 0; j < cells.length; j++) shore[j] = coast[cells[j]] * CELL_SIZE;
+
+  return { cells: Int32Array.from(cells), indices, weights, k, shore };
 }
 
 function blendFor(id, dem, points) {
@@ -107,6 +115,19 @@ function renderOverlay(png, cells, classes) {
     png.data[p + 1] = g;
     png.data[p + 2] = b;
     png.data[p + 3] = a;
+  }
+
+  return PNG.sync.write(png);
+}
+
+function renderBand(dem, cells, shore) {
+  const png = new PNG({ width: dem.width, height: dem.height });
+  png.data.fill(0);
+
+  for (let j = 0; j < cells.length; j++) {
+    const p = cells[j] * 4;
+    png.data[p] = Math.min(255, Math.round(shore[j] / CELL_SIZE));
+    png.data[p + 3] = 255;
   }
 
   return PNG.sync.write(png);
@@ -153,17 +174,27 @@ export function inspectSeaCell(dem, summary, hour, time, x, y) {
     layers[name] = weight ? round(value / weight, 2) : null;
   }
 
-  layers.clarity = round(math.clarityMeters(layers.visibility), 1);
-
   let score = 0;
   for (let n = 0; n < blend.k; n++)
-    score += summary.points[blend.indices[base + n]].score[hour] * blend.weights[base + n];
+    score +=
+      summary.points[blend.indices[base + n]].score[hour] *
+      blend.weights[base + n];
+
+  const open = layers.visibility;
+  if (open !== null) {
+    const adjusted = math.shoreAdjusted(open, blend.shore[j]);
+    score += VISIBILITY_SHARE * (adjusted - open);
+    layers.visibility = round(adjusted, 2);
+  }
+
+  layers.clarity = round(math.clarityMeters(layers.visibility), 1);
 
   return {
     time,
     x,
     y,
     offshore: false,
+    shore: Math.round(blend.shore[j]),
     class: SEA_CLASS_NAMES[math.classify(score)],
     score: round(score, 3),
     layers,
@@ -189,7 +220,7 @@ export async function buildSeaForecast(id, onOverlay) {
 
   const dem = await loadDem(id);
   const blend = blendFor(id, dem, points);
-  const { cells, indices, weights, k } = blend;
+  const { cells, indices, weights, k, shore } = blend;
 
   const hours = marine.time.length - marine.historyHours;
   const hourClass = new Uint8Array(hours);
@@ -198,6 +229,13 @@ export async function buildSeaForecast(id, onOverlay) {
 
   const png = new PNG({ width: dem.width, height: dem.height });
   png.data.fill(0);
+
+  if (onOverlay)
+    await onOverlay({
+      time: "band",
+      etag: `"${id}:band"`,
+      png: renderBand(dem, cells, shore),
+    });
 
   const summaryPoints = points.map((point) => ({
     lat: point.lat,
@@ -241,6 +279,20 @@ export async function buildSeaForecast(id, onOverlay) {
       for (let n = 0; n < k; n++)
         value += scores[indices[base + n]] * weights[base + n];
 
+      let visibility = 0;
+      let visibilityWeight = 0;
+      for (let n = 0; n < k; n++) {
+        const p = indices[base + n];
+        if (!present[VISIBILITY_INDEX][p]) continue;
+        visibility += readings[VISIBILITY_INDEX][p] * weights[base + n];
+        visibilityWeight += weights[base + n];
+      }
+
+      if (visibilityWeight) {
+        const open = visibility / visibilityWeight;
+        value += VISIBILITY_SHARE * (math.shoreAdjusted(open, shore[j]) - open);
+      }
+
       const seaClass = math.classify(value);
       classes[j] = seaClass;
       counts[seaClass]++;
@@ -257,9 +309,14 @@ export async function buildSeaForecast(id, onOverlay) {
         }
         if (!weight) continue;
 
-        const [, spec] = SCORED_LAYERS[li];
+        const [name, spec] = SCORED_LAYERS[li];
+        const reading =
+          name === "visibility"
+            ? math.shoreAdjusted(blended / weight, shore[j])
+            : blended / weight;
+
         const normalized = math.normalize(
-          blended / weight,
+          reading,
           spec.perfect,
           spec.undivable,
         );

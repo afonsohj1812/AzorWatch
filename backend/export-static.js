@@ -20,6 +20,7 @@ async function main() {
   console.log(`islands.json  ${islands.length} islands`);
 
   const storedAt = new Date().toISOString();
+  const failed = new Set();
 
   for (const model of MODELS) {
     await mkdir(`${OUT}/${model.summaries}`, { recursive: true });
@@ -35,17 +36,24 @@ async function main() {
       let islandBytes = 0;
       let hours = 0;
 
-      const { time, ...summary } = await model.build(
-        island.id,
-        async (overlay) => {
+      let summary;
+      try {
+        const built = await model.build(island.id, async (overlay) => {
           await writeFile(
             `${OUT}/${model.overlays}/${island.id}/${overlay.time}.png`,
             overlay.png,
           );
           islandBytes += overlay.png.length;
           hours++;
-        },
-      );
+        });
+
+        const { time, ...rest } = built;
+        summary = rest;
+      } catch (err) {
+        failed.add(model.kind);
+        console.log(`  ${model.kind} unavailable: ${err.message}`);
+        break;
+      }
 
       const json = JSON.stringify({ ...summary, storedAt });
       await writeFile(`${OUT}/${model.summaries}/${island.id}.json`, json);
@@ -63,6 +71,9 @@ async function main() {
     if (file.endsWith(".bin"))
       await copyFile(`${DEM_DIR}/${file}`, `${OUT}/dem/${file}`);
   }
+
+  if (failed.size)
+    console.log(`\nincomplete: ${[...failed].join(", ")} could not be built`);
 
   console.log(`\nwrote to ${OUT}/`);
 }

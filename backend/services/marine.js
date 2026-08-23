@@ -24,9 +24,15 @@ const MARINE = [
   "ocean_current_velocity",
   "sea_surface_temperature",
   "sea_level_height_msl",
+  "wind_wave_height",
 ];
 
-const WEATHER = ["wind_speed_10m", "wind_gusts_10m", "precipitation"];
+const WEATHER = [
+  "wind_speed_10m",
+  "wind_gusts_10m",
+  "precipitation",
+  "shortwave_radiation",
+];
 
 const TTL_MS = 30 * 60_000;
 
