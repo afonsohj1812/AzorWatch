@@ -10,8 +10,6 @@
       "visibility": { "perfect": 0, "undivable": 1, "weight": 2.5 },
       "current": { "perfect": 0.4, "undivable": 2.2, "weight": 2.0 },
       "wind": { "perfect": 8, "undivable": 30, "weight": 1.5 },
-      "gusts": { "perfect": 15, "undivable": 45, "weight": 1.0 },
-      "period": { "perfect": 9, "undivable": 4, "weight": 1.0 },
       "temperature": { "perfect": 21, "undivable": 15, "weight": 0.5 }
     },
 
@@ -79,7 +77,7 @@
 
   "cloudBase": { "saturationRh": 90, "lclCoefficient": 125 },
   "cloudTop": { "exitRh": 85, "maxThickness": 1500 },
-  "cloudCover": { "minLow": 40 },
+  "cloudCover": { "minLow": 25 },
   "windward": {
     "aspectTolerance": 60,
     "minSlope": 5,
@@ -94,24 +92,19 @@
 
   "classThresholds": { "yellow": 10000, "orange": 1000, "red": 100 },
   "summary": { "coverage": { "yellow": 0.25, "orange": 0.5, "red": 0.75 } },
+
   "surface": {
     "sampleGridDegrees": 0.0703125,
     "ramp": [
-      { "color": "#5f9fff", "rgb": [95, 159, 255, 140] },
-      { "color": "#5fdfcf", "rgb": [95, 223, 207, 140] },
-      { "color": "#ffdf5f", "rgb": [255, 223, 95, 140] },
-      { "color": "#ff6f4f", "rgb": [255, 111, 79, 140] }
+      { "color": "#3fff9f", "rgb": [63, 255, 159, 127] },
+      { "color": "#ffff3f", "rgb": [255, 255, 63, 127] },
+      { "color": "#ff7f3f", "rgb": [255, 127, 63, 127] },
+      { "color": "#ff3f3f", "rgb": [255, 63, 63, 127] }
     ],
-    "elevation": {
-      "label": "Elevation",
-      "unit": "m",
-      "min": 0,
-      "max": 2400
-    },
     "layers": {
       "cloudCover": {
         "source": "cloud_cover_low",
-        "label": "Cloud",
+        "label": "Cloud cover",
         "unit": "%",
         "min": 0,
         "max": 100

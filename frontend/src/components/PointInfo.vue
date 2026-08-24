@@ -12,6 +12,8 @@ const swatch = computed(
   () => paletteFor(props.mode).find((c) => c.id === props.point?.class) ?? null,
 );
 
+const isNumber = (value) => Number.isFinite(value);
+
 const metres = (value) => `${Math.round(value).toLocaleString("en-GB")} m`;
 
 const depthText = computed(() => {
@@ -26,19 +28,17 @@ const depthText = computed(() => {
 
 const FORMAT = {
   wave: (v) => `${v.toFixed(1)} m`,
-  period: (v) => `${v.toFixed(1)} s`,
   tide: (v) => `${v > 0 ? "+" : ""}${v.toFixed(2)} m`,
   current: (v) => `${v.toFixed(1)} km/h`,
   wind: (v) => `${Math.round(v)} km/h`,
-  gusts: (v) => `${Math.round(v)} km/h`,
   clarity: (v) => `${Math.round(v)} m`,
   temperature: (v) => `${v.toFixed(1)} °C`,
 };
 
 const SEA_GROUPS = [
-  { label: "Waves", main: "wave", sub: [["period", "period"]] },
+  { label: "Waves", main: "wave", sub: [] },
   { label: "Tide", main: "tide", sub: [["current", "current"]] },
-  { label: "Wind", main: "wind", sub: [["gusts", "gusts"]] },
+  { label: "Wind", main: "wind", sub: [] },
   { label: "Visibility", main: "clarity", sub: [] },
   { label: "Water", main: "temperature", sub: [] },
 ];
@@ -104,6 +104,10 @@ const seaGroups = computed(() => {
       <dl class="detail">
         <dt>Elevation</dt>
         <dd>{{ metres(point.elevation) }}</dd>
+        <template v-if="isNumber(point.cover)">
+          <dt>Cloud cover</dt>
+          <dd>{{ point.cover }}%</dd>
+        </template>
         <template v-if="point.cloudy !== false">
           <dt>Cloud</dt>
           <dd>{{ metres(point.cloudBase) }} – {{ metres(point.cloudTop) }}</dd>
@@ -160,14 +164,14 @@ dt {
 
 dd {
   display: flex;
-  flex-direction: column;
-  align-items: flex-end;
+  align-items: baseline;
+  justify-content: flex-end;
+  gap: 0.4rem;
   text-align: right;
 }
 
 .sub {
   font-size: 0.7rem;
-  line-height: 1.4;
   color: rgb(255 255 255 / 0.5);
   white-space: nowrap;
 }

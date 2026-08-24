@@ -95,7 +95,7 @@ app.get("/api/point/:islandId/:hour", async (req, res, next) => {
     if (index === -1) return res.status(404).json({ error: "unknown hour" });
 
     const dem = await loadDem(islandId);
-    res.json(inspectCell(dem, doc.conditions[index], hour, x, y));
+    res.json(inspectCell(dem, doc, index, hour, x, y));
   } catch (err) {
     next(err);
   }

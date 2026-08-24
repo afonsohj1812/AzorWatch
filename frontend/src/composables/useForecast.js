@@ -11,12 +11,7 @@ import {
 } from "../api";
 import { createFogMath, FOG_CLASS_NAMES, OCEAN } from "../services/fogMath";
 import { createSeaMath, nearestPoints, SEA_CLASS_NAMES } from "../services/seaMath";
-import {
-  FOG_ELEVATION,
-  OVERALL,
-  isSurfaceLayer,
-  renderLayer,
-} from "../layers";
+import { OVERALL, isSurfaceLayer, renderLayer } from "../layers";
 
 const DEFAULT_ISLAND = "terceira";
 const DEFAULT_MODE = "fog";
@@ -51,6 +46,33 @@ function fetchDem(url) {
     );
 
   return demCache.get(url);
+}
+
+function coverAt(model, dem, points, hour, x, y) {
+  if (!points?.length) return null;
+
+  const source = model.surface.layers.cloudCover.source;
+  const [west, south, east, north] = dem.bbox;
+  const lon = west + ((x + 0.5) / dem.width) * (east - west);
+  const lat = north - ((y + 0.5) / dem.height) * (north - south);
+
+  let value = 0;
+  let weight = 0;
+
+  for (const { index, weight: share } of nearestPoints(
+    lat,
+    lon,
+    points,
+    model.sea.neighbors,
+    model.sea.idwPower,
+  )) {
+    const reading = points[index][source]?.[hour];
+    if (!Number.isFinite(reading)) continue;
+    value += reading * share;
+    weight += share;
+  }
+
+  return weight ? Math.round(value / weight) : null;
 }
 
 const azoresHour = () =>
@@ -160,17 +182,11 @@ export function useForecast() {
 
   const overlayFor = (time) => overlayUrl(mode.value, islandId.value, time);
 
-  const showingElevation = computed(
-    () => mode.value === "fog" && layer.value === FOG_ELEVATION,
-  );
-
   const hourlyOverlay = computed(() =>
     hour.value ? overlayFor(hour.value.time) : null,
   );
 
-  const currentOverlay = computed(() =>
-    showingElevation.value ? overlayFor(FOG_ELEVATION) : hourlyOverlay.value,
-  );
+  const currentOverlay = hourlyOverlay;
 
   const layerOverlay = ref(null);
   const showingLayer = computed(
@@ -225,7 +241,7 @@ export function useForecast() {
   );
 
   const prefetchUrls = computed(() =>
-    showingLayer.value || showingElevation.value
+    showingLayer.value
       ? []
       : [hourIndex.value - 1, hourIndex.value + 1]
           .filter((i) => i >= 0 && i < hours.value.length)
@@ -276,8 +292,8 @@ export function useForecast() {
     const base = { time: hour.value.time, x, y };
     if (z === OCEAN) return { ...base, sea: true, class: "none" };
 
-    const c =
-      forecast.value.conditions[dayIndex.value * HOURS_PER_DAY + hourIndex.value];
+    const at = dayIndex.value * HOURS_PER_DAY + hourIndex.value;
+    const c = forecast.value.conditions[at];
 
     const cloudBase = fogMath.localBase(dem.aspect[index], dem.slope[index], c);
     const fogClass = fogMath.classifyCell(z, cloudBase, c);
@@ -290,6 +306,7 @@ export function useForecast() {
       elevation: z,
       slope: dem.slope[index],
       aspect: dem.aspect[index] * 2,
+      cover: coverAt(model, dem, forecast.value.points, at, x, y),
       cloudBase: Math.round(cloudBase),
       cloudTop: Math.round(c.top),
       depth: Math.round(z - cloudBase),

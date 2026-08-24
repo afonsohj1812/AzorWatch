@@ -6,8 +6,6 @@ export const LAYER_SOURCES = {
   wave: "wave_height",
   current: "ocean_current_velocity",
   wind: "wind_speed_10m",
-  gusts: "wind_gusts_10m",
-  period: "swell_wave_period",
   temperature: "sea_surface_temperature",
   tide: "sea_level_height_msl",
 };

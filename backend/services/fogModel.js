@@ -6,6 +6,7 @@ import { loadDem } from "./dem.js";
 import { dayLabel, weekday } from "./dates.js";
 import { getForecast } from "./forecast.js";
 import { getSurface } from "./surface.js";
+import { nearestPoints } from "./seaMath.js";
 
 const config = JSON.parse(
   readFileSync(new URL("../config/model.json", import.meta.url)),
@@ -28,24 +29,12 @@ const {
 
 const HOURS_PER_DAY = 24;
 
-function renderOverlay(classes, width, height) {
-  const png = new PNG({ width, height });
-
-  for (let i = 0; i < classes.length; i++) {
-    const [r, g, b, a] = PALETTE[classes[i]];
-    const p = i * 4;
-    png.data[p] = r;
-    png.data[p + 1] = g;
-    png.data[p + 2] = b;
-    png.data[p + 3] = a;
-  }
-
-  return PNG.sync.write(png);
-}
-
 const SURFACE_SOURCES = Object.values(config.surface.layers).map(
   (layer) => layer.source,
 );
+const CLOUD_SOURCE = config.surface.layers.cloudCover.source;
+const NEIGHBORS = config.sea.neighbors;
+const IDW_POWER = config.sea.idwPower;
 
 function landMask(dem) {
   const classes = new Uint8Array(dem.elevation.length);
@@ -54,24 +43,37 @@ function landMask(dem) {
   return classes;
 }
 
-const RAMP = config.surface.ramp.map((entry) => entry.rgb);
+function coverAt(dem, points, index, x, y) {
+  if (!points?.length) return null;
 
-function renderElevation(dem) {
-  const spec = config.surface.elevation;
-  const span = spec.max - spec.min;
-  const png = new PNG({ width: dem.width, height: dem.height });
-  png.data.fill(0);
+  const [west, south, east, north] = dem.bbox;
+  const lon = west + ((x + 0.5) / dem.width) * (east - west);
+  const lat = north - ((y + 0.5) / dem.height) * (north - south);
 
-  for (let i = 0; i < dem.elevation.length; i++) {
-    if (dem.elevation[i] === OCEAN) continue;
+  let value = 0;
+  let weight = 0;
 
-    const fraction = span === 0 ? 0 : (dem.elevation[i] - spec.min) / span;
-    const bin = Math.min(
-      RAMP.length - 1,
-      Math.max(0, Math.floor(fraction * RAMP.length)),
-    );
+  for (const { index: p, weight: share } of nearestPoints(
+    lat,
+    lon,
+    points,
+    NEIGHBORS,
+    IDW_POWER,
+  )) {
+    const reading = points[p][CLOUD_SOURCE]?.[index];
+    if (!Number.isFinite(reading)) continue;
+    value += reading * share;
+    weight += share;
+  }
 
-    const [r, g, b, a] = RAMP[bin];
+  return weight ? Math.round(value / weight) : null;
+}
+
+function renderOverlay(classes, width, height) {
+  const png = new PNG({ width, height });
+
+  for (let i = 0; i < classes.length; i++) {
+    const [r, g, b, a] = PALETTE[classes[i]];
     const p = i * 4;
     png.data[p] = r;
     png.data[p + 1] = g;
@@ -95,26 +97,19 @@ export async function buildForecast(id, onOverlay) {
     if (dem.elevation[i] !== OCEAN) landCells++;
 
   const surface = await getSurface().catch((err) => {
-    console.warn(`surface layers unavailable (${err.message})`);
+    console.warn(`cloud layer unavailable (${err.message})`);
     return null;
   });
 
   const coverage = config.summary.coverage;
   const hourClass = new Uint8Array(hours);
 
-  if (onOverlay) {
+  if (onOverlay)
     await onOverlay({
       time: "land",
       etag: `"${runAt}:${id}:land"`,
       png: renderOverlay(landMask(dem), dem.width, dem.height),
     });
-
-    await onOverlay({
-      time: "elevation",
-      etag: `"${id}:elevation"`,
-      png: renderElevation(dem),
-    });
-  }
 
   for (let hour = 0; hour < hours; hour++) {
     const classes = classifyHour(dem, forecast, hour);
@@ -173,15 +168,15 @@ export async function buildForecast(id, onOverlay) {
     points: (surface?.islands[id] ?? []).map((point) => ({
       lat: point.lat,
       lon: point.lon,
-      elevation: point.elevation,
       ...Object.fromEntries(SURFACE_SOURCES.map((k) => [k, point[k]])),
     })),
   };
 }
 
-export function inspectCell(dem, c, time, x, y) {
+export function inspectCell(dem, doc, hour, time, x, y) {
   if (x < 0 || y < 0 || x >= dem.width || y >= dem.height) return null;
 
+  const c = doc.conditions[hour];
   const index = y * dem.width + x;
   const z = dem.elevation[index];
 
@@ -205,6 +200,7 @@ export function inspectCell(dem, c, time, x, y) {
     depth: Math.round(z - base),
     aboveCloud: z > c.top,
     visibility: visibilityAt(z, base, fogClass, c),
+    cover: coverAt(dem, doc.points, hour, x, y),
   };
 }
 

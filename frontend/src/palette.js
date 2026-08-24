@@ -29,9 +29,6 @@ function rampLegend(spec) {
 }
 
 export function legendFor(mode, layer) {
-  if (mode === "fog" && layer === "elevation")
-    return rampLegend(model.surface.elevation);
-
   const surface = model.surface.layers[layer];
   if (surface) return rampLegend(surface);
 

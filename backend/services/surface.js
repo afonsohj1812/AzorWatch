@@ -107,7 +107,6 @@ async function fetchAll() {
       points.push({
         lat: entry.latitude,
         lon: entry.longitude,
-        elevation: entry.elevation,
         ...Object.fromEntries(SOURCES.map((k) => [k, entry.hourly[k]])),
       });
     }

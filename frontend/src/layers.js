@@ -13,13 +13,10 @@ const PALETTE = SEA_CLASS_NAMES.map(
 
 export const OVERALL = "overall";
 
-export const FOG_ELEVATION = "elevation";
-
 export const SURFACE_LAYERS = model.surface.layers;
 
 export const FOG_LAYERS = [
   { id: OVERALL, label: "Overall" },
-  { id: FOG_ELEVATION, label: "Elevation" },
   ...Object.entries(SURFACE_LAYERS).map(([id, spec]) => ({
     id,
     label: spec.label,
@@ -30,20 +27,21 @@ export const isSurfaceLayer = (layer) => layer in SURFACE_LAYERS;
 
 const RAMP = model.surface.ramp.map((entry) => entry.rgb);
 
-export function rampBin(value, spec) {
+export const rampBin = (value, spec) => {
   const span = spec.max - spec.min;
   const fraction = span === 0 ? 0 : (value - spec.min) / span;
-  return Math.min(RAMP.length - 1, Math.max(0, Math.floor(fraction * RAMP.length)));
-}
+  return Math.min(
+    RAMP.length - 1,
+    Math.max(0, Math.floor(fraction * RAMP.length)),
+  );
+};
 
 export const SEA_LAYERS = [
   { id: OVERALL, label: "Overall" },
   { id: "wave", label: "Waves" },
   { id: "visibility", label: "Visibility" },
-  { id: "period", label: "Period" },
   { id: "current", label: "Current" },
   { id: "wind", label: "Wind" },
-  { id: "gusts", label: "Gusts" },
   { id: "temperature", label: "Water" },
 ];
 
