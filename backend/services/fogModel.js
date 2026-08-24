@@ -15,7 +15,7 @@ const config = JSON.parse(
 const math = createFogMath(config);
 
 const PALETTE = FOG_CLASS_NAMES.map(
-  (name) => config.classes.find((c) => c.id === name).rgb,
+  (name) => config.classes[name].rgb,
 );
 
 const {
@@ -29,10 +29,10 @@ const {
 
 const HOURS_PER_DAY = 24;
 
-const SURFACE_SOURCES = Object.values(config.surface.layers).map(
+const SURFACE_SOURCES = Object.values(config.fog.surface.layers).map(
   (layer) => layer.source,
 );
-const CLOUD_SOURCE = config.surface.layers.cloudCover.source;
+const CLOUD_SOURCE = config.fog.surface.layers.cloudCover.source;
 const NEIGHBORS = config.sea.neighbors;
 const IDW_POWER = config.sea.idwPower;
 
@@ -101,7 +101,7 @@ export async function buildForecast(id, onOverlay) {
     return null;
   });
 
-  const coverage = config.summary.coverage;
+  const coverage = config.fog.summary.coverage;
   const hourClass = new Uint8Array(hours);
 
   if (onOverlay)

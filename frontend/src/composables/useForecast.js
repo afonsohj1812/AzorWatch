@@ -51,7 +51,7 @@ function fetchDem(url) {
 function coverAt(model, dem, points, hour, x, y) {
   if (!points?.length) return null;
 
-  const source = model.surface.layers.cloudCover.source;
+  const source = model.fog.surface.layers.cloudCover.source;
   const [west, south, east, north] = dem.bbox;
   const lon = west + ((x + 0.5) / dem.width) * (east - west);
   const lat = north - ((y + 0.5) / dem.height) * (north - south);

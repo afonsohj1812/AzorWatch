@@ -7,8 +7,19 @@ export const OCEAN = -32768;
 const radians = (degrees) => (degrees * Math.PI) / 180;
 
 export function createFogMath(config) {
+  const {
+    cloudBase: cloudBaseConfig,
+    cloudTop: cloudTopConfig,
+    cloudCover,
+    windward,
+    lwc: lwcConfig,
+    kunkel,
+    mist,
+    classThresholds,
+  } = config.fog;
+
   function saturationHeight(profile) {
-    const target = config.cloudBase.saturationRh;
+    const target = cloudBaseConfig.saturationRh;
     for (let i = 0; i < profile.length; i++) {
       if (profile[i].humidity < target) continue;
       if (i === 0) return profile[0].height;
@@ -24,13 +35,13 @@ export function createFogMath(config) {
   function lclHeight(temperature, dewPoint, modelElevation) {
     return (
       modelElevation +
-      config.cloudBase.lclCoefficient * (temperature - dewPoint)
+      cloudBaseConfig.lclCoefficient * (temperature - dewPoint)
     );
   }
 
   function cloudTopHeight(profile, base) {
-    const cap = base + config.cloudTop.maxThickness;
-    const exit = config.cloudTop.exitRh;
+    const cap = base + cloudTopConfig.maxThickness;
+    const exit = cloudTopConfig.exitRh;
 
     for (let i = 1; i < profile.length; i++) {
       const level = profile[i];
@@ -50,15 +61,15 @@ export function createFogMath(config) {
   }
 
   function depthForVisibility(visibility) {
-    const { coefficient, exponent } = config.kunkel;
+    const { coefficient, exponent } = kunkel;
     const lwc = Math.pow(3912 / (coefficient * visibility), 1 / exponent);
-    const perKm = config.lwc.subAdiabaticFactor * config.lwc.adiabaticGradient;
+    const perKm = lwcConfig.subAdiabaticFactor * lwcConfig.adiabaticGradient;
     return (lwc * 1000) / perKm;
   }
 
   function visibilityForDepth(depth) {
-    const { coefficient, exponent } = config.kunkel;
-    const perKm = config.lwc.subAdiabaticFactor * config.lwc.adiabaticGradient;
+    const { coefficient, exponent } = kunkel;
+    const perKm = lwcConfig.subAdiabaticFactor * lwcConfig.adiabaticGradient;
     const lwc = (perKm * depth) / 1000;
     if (lwc <= 0) return null;
 
@@ -66,9 +77,9 @@ export function createFogMath(config) {
   }
 
   function visibilityInYellow(z, base, c) {
-    const { yellow, orange } = config.classThresholds;
+    const { yellow, orange } = classThresholds;
 
-    const bottom = base - config.mist.belowBaseBand;
+    const bottom = base - mist.belowBaseBand;
     const top = base + c.orangeDepth;
     if (!(top > bottom)) return orange;
 
@@ -109,32 +120,32 @@ export function createFogMath(config) {
       base,
       top: cloudTopHeight(profile, base),
       cover: surface.cloud_cover_low[hour],
-      orangeDepth: depthForVisibility(config.classThresholds.orange),
-      redDepth: depthForVisibility(config.classThresholds.red),
+      orangeDepth: depthForVisibility(classThresholds.orange),
+      redDepth: depthForVisibility(classThresholds.red),
       windDirection: surface.wind_direction_10m[hour],
       windSpeed: surface.wind_speed_10m[hour],
     };
   }
 
   function windwardLowering(aspectDegrees, slopeDegrees, wind) {
-    if (slopeDegrees < config.windward.minSlope) return 0;
+    if (slopeDegrees < windward.minSlope) return 0;
 
     let diff = Math.abs(aspectDegrees - wind.windDirection) % 360;
     if (diff > 180) diff = 360 - diff;
-    if (diff > config.windward.aspectTolerance) return 0;
+    if (diff > windward.aspectTolerance) return 0;
 
-    const facing = 1 - diff / config.windward.aspectTolerance;
+    const facing = 1 - diff / windward.aspectTolerance;
     const strength = Math.min(
       1,
-      wind.windSpeed / config.windward.fullEffectWindSpeed,
+      wind.windSpeed / windward.fullEffectWindSpeed,
     );
     const steepness = Math.min(
       1,
       Math.sin(radians(slopeDegrees)) /
-        Math.sin(radians(config.windward.fullEffectSlope)),
+        Math.sin(radians(windward.fullEffectSlope)),
     );
 
-    return config.windward.maxLowering * facing * strength * steepness;
+    return windward.maxLowering * facing * strength * steepness;
   }
 
   function localBase(aspectByte, slopeDegrees, c) {
@@ -142,7 +153,7 @@ export function createFogMath(config) {
   }
 
   function hasCloud(c) {
-    return c.cover == null || c.cover >= config.cloudCover.minLow;
+    return c.cover == null || c.cover >= cloudCover.minLow;
   }
 
   function classifyCell(z, base, c) {
@@ -156,7 +167,7 @@ export function createFogMath(config) {
           ? FOG_CLASS.ORANGE
           : FOG_CLASS.YELLOW;
     }
-    if (-depth <= config.mist.belowBaseBand) return FOG_CLASS.YELLOW;
+    if (-depth <= mist.belowBaseBand) return FOG_CLASS.YELLOW;
     return FOG_CLASS.NONE;
   }
 

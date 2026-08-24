@@ -5,12 +5,14 @@ import { loadDem } from "./dem.js";
 
 const API = "https://api.open-meteo.com/v1/forecast";
 
-const { forecastDays, surface } = JSON.parse(
+const { forecastDays, fog } = JSON.parse(
   readFileSync(new URL("../config/model.json", import.meta.url)),
 );
 
-const GRID = surface.sampleGridDegrees;
-const SOURCES = Object.values(surface.layers).map((layer) => layer.source);
+const GRID = fog.surface.sampleGridDegrees;
+const SOURCES = Object.values(fog.surface.layers).map(
+  (layer) => layer.source,
+);
 
 const HOURS_PER_DAY = 24;
 const EXPECTED_HOURS = forecastDays * HOURS_PER_DAY;

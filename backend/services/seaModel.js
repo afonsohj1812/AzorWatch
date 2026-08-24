@@ -13,7 +13,7 @@ const config = JSON.parse(
 const math = createSeaMath(config);
 
 const PALETTE = SEA_CLASS_NAMES.map(
-  (name) => config.sea.classes.find((c) => c.id === name).rgb,
+  (name) => config.classes[name].rgb,
 );
 
 const LAYER_NAMES = ["visibility", ...Object.keys(LAYER_SOURCES)];

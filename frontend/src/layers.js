@@ -8,12 +8,12 @@ import {
 const math = createSeaMath(model);
 
 const PALETTE = SEA_CLASS_NAMES.map(
-  (name) => model.sea.classes.find((entry) => entry.id === name).rgb,
+  (name) => model.classes[name].rgb,
 );
 
 export const OVERALL = "overall";
 
-export const SURFACE_LAYERS = model.surface.layers;
+export const SURFACE_LAYERS = model.fog.surface.layers;
 
 export const FOG_LAYERS = [
   { id: OVERALL, label: "Overall" },
@@ -25,7 +25,7 @@ export const FOG_LAYERS = [
 
 export const isSurfaceLayer = (layer) => layer in SURFACE_LAYERS;
 
-const RAMP = model.surface.ramp.map((entry) => entry.rgb);
+const RAMP = model.fog.surface.ramp.map((id) => model.classes[id].rgb);
 
 export const rampBin = (value, spec) => {
   const span = spec.max - spec.min;

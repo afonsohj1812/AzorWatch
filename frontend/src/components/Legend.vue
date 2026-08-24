@@ -35,7 +35,7 @@ const open = ref(false);
     <div class="title">{{ title }}</div>
     <div v-for="entry in entries" :key="entry.id" class="row">
       <span class="swatch" :style="{ background: entry.color }" />
-      <span class="range">{{ entry.range }}</span>
+      <span class="range">{{ entry.label }}</span>
     </div>
   </div>
 </template>

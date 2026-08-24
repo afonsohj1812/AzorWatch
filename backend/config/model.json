@@ -1,6 +1,56 @@
 {
   "cellSize": 50,
   "forecastDays": 4,
+
+  "classes": {
+    "none": { "color": "#dfdfdf", "rgb": [0, 0, 0, 0] },
+    "green": { "color": "#3fff9f", "rgb": [63, 255, 159, 127] },
+    "yellow": { "color": "#ffff3f", "rgb": [255, 255, 63, 127] },
+    "orange": { "color": "#ff7f3f", "rgb": [255, 127, 63, 127] },
+    "red": { "color": "#ff3f3f", "rgb": [255, 63, 63, 127] }
+  },
+
+  "fog": {
+    "cloudBase": { "saturationRh": 90, "lclCoefficient": 125 },
+    "cloudTop": { "exitRh": 85, "maxThickness": 1500 },
+    "cloudCover": { "minLow": 25 },
+    "windward": {
+      "aspectTolerance": 60,
+      "minSlope": 5,
+      "maxLowering": 80,
+      "fullEffectWindSpeed": 30,
+      "fullEffectSlope": 30
+    },
+
+    "lwc": { "adiabaticGradient": 2.0, "subAdiabaticFactor": 0.5 },
+    "kunkel": { "coefficient": 144.7, "exponent": 0.88 },
+    "mist": { "belowBaseBand": 100 },
+
+    "classThresholds": { "yellow": 10000, "orange": 1000, "red": 100 },
+    "summary": { "coverage": { "yellow": 0.25, "orange": 0.5, "red": 0.75 } },
+
+    "surface": {
+      "sampleGridDegrees": 0.0703125,
+      "ramp": ["green", "yellow", "orange", "red"],
+      "layers": {
+        "cloudCover": {
+          "source": "cloud_cover_low",
+          "label": "Cloud cover",
+          "unit": "%",
+          "min": 0,
+          "max": 100
+        }
+      }
+    },
+
+    "classes": [
+      { "id": "red", "label": "10m - 100m" },
+      { "id": "orange", "label": "100m - 1km" },
+      { "id": "yellow", "label": "1km - 10km" },
+      { "id": "none", "label": "> 10km" }
+    ]
+  },
+
   "sea": {
     "bandMeters": 1000,
     "sampleGridDegrees": 0.0833333,
@@ -48,94 +98,10 @@
     "idwPower": 3,
 
     "classes": [
-      {
-        "id": "red",
-        "color": "#ff3f3f",
-        "rgb": [255, 63, 63, 127],
-        "range": "undivable"
-      },
-      {
-        "id": "orange",
-        "color": "#ff7f3f",
-        "rgb": [255, 127, 63, 127],
-        "range": "marginal"
-      },
-      {
-        "id": "yellow",
-        "color": "#ffff3f",
-        "rgb": [255, 255, 63, 127],
-        "range": "divable"
-      },
-      {
-        "id": "green",
-        "color": "#3fff9f",
-        "rgb": [63, 255, 159, 127],
-        "range": "perfect"
-      }
+      { "id": "red", "label": "Undivable" },
+      { "id": "orange", "label": "Marginal" },
+      { "id": "yellow", "label": "Divable" },
+      { "id": "green", "label": "Perfect" }
     ]
-  },
-
-  "cloudBase": { "saturationRh": 90, "lclCoefficient": 125 },
-  "cloudTop": { "exitRh": 85, "maxThickness": 1500 },
-  "cloudCover": { "minLow": 25 },
-  "windward": {
-    "aspectTolerance": 60,
-    "minSlope": 5,
-    "maxLowering": 80,
-    "fullEffectWindSpeed": 30,
-    "fullEffectSlope": 30
-  },
-
-  "lwc": { "adiabaticGradient": 2.0, "subAdiabaticFactor": 0.5 },
-  "kunkel": { "coefficient": 144.7, "exponent": 0.88 },
-  "mist": { "belowBaseBand": 100 },
-
-  "classThresholds": { "yellow": 10000, "orange": 1000, "red": 100 },
-  "summary": { "coverage": { "yellow": 0.25, "orange": 0.5, "red": 0.75 } },
-
-  "surface": {
-    "sampleGridDegrees": 0.0703125,
-    "ramp": [
-      { "color": "#3fff9f", "rgb": [63, 255, 159, 127] },
-      { "color": "#ffff3f", "rgb": [255, 255, 63, 127] },
-      { "color": "#ff7f3f", "rgb": [255, 127, 63, 127] },
-      { "color": "#ff3f3f", "rgb": [255, 63, 63, 127] }
-    ],
-    "layers": {
-      "cloudCover": {
-        "source": "cloud_cover_low",
-        "label": "Cloud cover",
-        "unit": "%",
-        "min": 0,
-        "max": 100
-      }
-    }
-  },
-
-  "classes": [
-    {
-      "id": "red",
-      "color": "#ff3f3f",
-      "rgb": [255, 63, 63, 127],
-      "range": "10m - 100m"
-    },
-    {
-      "id": "orange",
-      "color": "#ff7f3f",
-      "rgb": [255, 127, 63, 127],
-      "range": "100m - 1km"
-    },
-    {
-      "id": "yellow",
-      "color": "#ffff3f",
-      "rgb": [255, 255, 63, 127],
-      "range": "1km - 10km"
-    },
-    {
-      "id": "none",
-      "color": "#dfdfdf",
-      "rgb": [0, 0, 0, 0],
-      "range": "> 10km"
-    }
-  ]
+  }
 }

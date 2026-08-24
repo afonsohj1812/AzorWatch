@@ -71,7 +71,7 @@ const seaGroups = computed(() => {
       <template v-else>
         <div class="headline">
           <span class="swatch" :style="{ background: swatch?.color }" />
-          <span>{{ swatch?.range }}</span>
+          <span>{{ swatch?.label }}</span>
         </div>
 
         <dl class="detail">
@@ -95,7 +95,7 @@ const seaGroups = computed(() => {
       <div class="headline">
         <span class="swatch" :style="{ background: swatch?.color }" />
         <span>{{
-          point.visibility ? metres(point.visibility) : swatch?.range
+          point.visibility ? metres(point.visibility) : swatch?.label
         }}</span>
       </div>
 
