@@ -40,9 +40,8 @@ export const SEA_LAYERS = [
   { id: OVERALL, label: "Overall" },
   { id: "wave", label: "Waves" },
   { id: "visibility", label: "Visibility" },
-  { id: "current", label: "Current" },
   { id: "wind", label: "Wind" },
-  { id: "temperature", label: "Water" },
+  { id: "tide", label: "Tide" },
 ];
 
 export const layersFor = (mode) => (mode === "sea" ? SEA_LAYERS : FOG_LAYERS);

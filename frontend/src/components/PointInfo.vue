@@ -14,7 +14,7 @@ const swatch = computed(
 
 const isNumber = (value) => Number.isFinite(value);
 
-const metres = (value) => `${Math.round(value).toLocaleString("en-GB")} m`;
+const metres = (value) => `${Math.round(value).toLocaleString("en-GB")}m`;
 
 const depthText = computed(() => {
   const p = props.point;
@@ -27,35 +27,35 @@ const depthText = computed(() => {
 });
 
 const FORMAT = {
-  wave: (v) => `${v.toFixed(1)} m`,
-  tide: (v) => `${v > 0 ? "+" : ""}${v.toFixed(2)} m`,
-  current: (v) => `${v.toFixed(1)} km/h`,
-  wind: (v) => `${Math.round(v)} km/h`,
-  clarity: (v) => `${Math.round(v)} m`,
-  temperature: (v) => `${v.toFixed(1)} °C`,
+  wave: (v) => `${v.toFixed(1)}m`,
+  tide: (v) => `${v > 0 ? "+" : ""}${v.toFixed(2)}m`,
+  wind: (v) => `${Math.round(v)}km/h`,
+  clarity: (v) => `${Math.round(v)}m`,
 };
 
 const SEA_GROUPS = [
-  { label: "Waves", main: "wave", sub: [] },
-  { label: "Tide", main: "tide", sub: [["current", "current"]] },
-  { label: "Wind", main: "wind", sub: [] },
-  { label: "Visibility", main: "clarity", sub: [] },
-  { label: "Water", main: "temperature", sub: [] },
+  { label: "Waves", main: "wave", direction: "wave" },
+  { label: "Wind", main: "wind", direction: "wind" },
+  { label: "Tide", main: "tide" },
+  { label: "Visibility", main: "clarity" },
 ];
 
 const seaGroups = computed(() => {
   const layers = props.point?.layers;
   if (!layers) return [];
 
+  const directions = props.point?.directions ?? {};
+
   return SEA_GROUPS.filter((group) => Number.isFinite(layers[group.main])).map(
-    (group) => ({
-      label: group.label,
-      main: FORMAT[group.main](layers[group.main]),
-      sub: group.sub
-        .filter(([, key]) => Number.isFinite(layers[key]))
-        .map(([name, key]) => `${name} ${FORMAT[key](layers[key])}`)
-        .join(" · "),
-    }),
+    (group) => {
+      const bearing = directions[group.direction];
+
+      return {
+        label: group.label,
+        value: FORMAT[group.main](layers[group.main]),
+        bearing: Number.isFinite(bearing) ? bearing : null,
+      };
+    },
   );
 });
 </script>
@@ -78,8 +78,13 @@ const seaGroups = computed(() => {
           <template v-for="group in seaGroups" :key="group.label">
             <dt>{{ group.label }}</dt>
             <dd>
-              <span>{{ group.main }}</span>
-              <span v-if="group.sub" class="sub">{{ group.sub }}</span>
+              <span>{{ group.value }}</span>
+              <span
+                v-if="group.bearing !== null"
+                class="arrow"
+                :style="{ transform: `rotate(${group.bearing}deg)` }"
+                >&#8593;</span
+              >
             </dd>
           </template>
         </dl>
@@ -162,6 +167,11 @@ dt {
   color: rgb(255 255 255 / 0.5);
 }
 
+.arrow {
+  display: inline-block;
+  line-height: 1;
+}
+
 dd {
   display: flex;
   align-items: baseline;
@@ -170,9 +180,4 @@ dd {
   text-align: right;
 }
 
-.sub {
-  font-size: 0.7rem;
-  color: rgb(255 255 255 / 0.5);
-  white-space: nowrap;
-}
 </style>

@@ -20,14 +20,14 @@ const EXPECTED_HOURS = (forecastDays + PAST_DAYS) * HOURS_PER_DAY;
 
 const MARINE = [
   "wave_height",
-  "ocean_current_velocity",
-  "sea_surface_temperature",
+  "wave_direction",
   "sea_level_height_msl",
   "wind_wave_height",
 ];
 
 const WEATHER = [
   "wind_speed_10m",
+  "wind_direction_10m",
   "precipitation",
   "shortwave_radiation",
 ];

@@ -57,11 +57,12 @@
 
     "layers": {
       "wave": { "perfect": 0.3, "undivable": 2.0, "weight": 3.0 },
-      "visibility": { "perfect": 0, "undivable": 1, "weight": 2.5 },
-      "current": { "perfect": 0.4, "undivable": 2.2, "weight": 2.0 },
-      "wind": { "perfect": 8, "undivable": 30, "weight": 1.5 },
-      "temperature": { "perfect": 21, "undivable": 15, "weight": 0.5 }
+      "visibility": { "perfect": 0, "undivable": 1, "weight": 2.0 },
+      "wind": { "perfect": 8, "undivable": 30, "weight": 2.5 },
+      "tide": { "perfect": 0.3, "undivable": -0.9, "weight": 2.0 }
     },
+
+    "exposure": { "wave": 0.4, "wind": 0.5 },
 
     "turbidity": {
       "stirHours": 12,

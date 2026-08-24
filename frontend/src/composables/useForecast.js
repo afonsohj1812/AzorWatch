@@ -361,24 +361,55 @@ export function useForecast() {
       layers[name] = weight ? value / weight : null;
     }
 
-    let score = 0;
-    for (const { index: p, weight: w } of blend) score += points[p].score[at] * w;
+    layers.visibility = seaMath.shoreAdjusted(
+      layers.visibility,
+      dem.coast[index] * model.cellSize,
+    );
 
-    const open = layers.visibility;
-    if (Number.isFinite(open)) {
-      const specs = Object.values(model.sea.layers);
-      const share =
-        model.sea.layers.visibility.weight /
-        specs.reduce((sum, spec) => sum + spec.weight, 0);
+    const gx = ((dem.coast[index + 1] ?? 0) - (dem.coast[index - 1] ?? 0)) / 2;
+    const gy =
+      ((dem.coast[index + dem.width] ?? 0) -
+        (dem.coast[index - dem.width] ?? 0)) /
+      2;
 
-      const adjusted = seaMath.shoreAdjusted(
-        open,
-        dem.coast[index] * model.cellSize,
-      );
+    const bearing = Math.atan2(gx, -gy);
+    const nx = gx === 0 && gy === 0 ? 0 : Math.cos(bearing);
+    const ny = gx === 0 && gy === 0 ? 0 : Math.sin(bearing);
 
-      score += share * (adjusted - open);
-      layers.visibility = adjusted;
+    let sum = 0;
+    let used = 0;
+    const directions = {};
+
+    for (const [name, spec] of Object.entries(model.sea.layers)) {
+      let reading = layers[name];
+      if (!Number.isFinite(reading)) continue;
+
+      if (name in model.sea.exposure) {
+        let fx = 0;
+        let fy = 0;
+        for (const { index: p, weight: w } of blend) {
+          const degrees = points[p].directions?.[name]?.[at];
+          if (!Number.isFinite(degrees)) continue;
+          const d = (degrees * Math.PI) / 180;
+          fx += Math.cos(d) * w;
+          fy += Math.sin(d) * w;
+        }
+
+        directions[name] =
+          fx === 0 && fy === 0
+            ? null
+            : Math.round(((Math.atan2(fy, fx) * 180) / Math.PI + 360) % 360);
+
+        reading = seaMath.exposed(reading, name, fx * nx + fy * ny);
+        layers[name] = reading;
+      }
+
+      sum +=
+        seaMath.normalize(reading, spec.perfect, spec.undivable) * spec.weight;
+      used += spec.weight;
     }
+
+    const score = used ? sum / used : 1;
 
     layers.clarity = seaMath.clarityMeters(layers.visibility);
 
@@ -388,6 +419,7 @@ export function useForecast() {
       class: SEA_CLASS_NAMES[seaMath.classify(score)],
       score,
       layers,
+      directions,
     };
   }
 

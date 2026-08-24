@@ -4,10 +4,13 @@ export const SEA_CLASS_NAMES = ["green", "yellow", "orange", "red"];
 
 export const LAYER_SOURCES = {
   wave: "wave_height",
-  current: "ocean_current_velocity",
   wind: "wind_speed_10m",
-  temperature: "sea_surface_temperature",
   tide: "sea_level_height_msl",
+};
+
+export const DIRECTION_SOURCES = {
+  wave: "wave_direction",
+  wind: "wind_direction_10m",
 };
 
 export function nearestPoints(lat, lon, points, count, power) {
@@ -38,7 +41,7 @@ export function nearestPoints(lat, lon, points, count, power) {
 }
 
 export function createSeaMath(config) {
-  const { layers, turbidity, shore, classThresholds } = config.sea;
+  const { layers, turbidity, shore, exposure, classThresholds } = config.sea;
 
   function normalize(value, perfect, undivable) {
     if (!Number.isFinite(value)) return null;
@@ -114,6 +117,13 @@ export function createSeaMath(config) {
     );
   }
 
+  function exposed(value, name, facing) {
+    const weight = exposure[name];
+    if (!Number.isFinite(value) || !weight || !facing) return value;
+
+    return Math.max(0, value * (1 + weight * facing));
+  }
+
   function shoreAdjusted(value, coastMeters) {
     if (!Number.isFinite(value)) return value;
 
@@ -172,6 +182,7 @@ export function createSeaMath(config) {
 
   return {
     normalize,
+    exposed,
     turbidityAt,
     shoreAdjusted,
     clarityMeters,
