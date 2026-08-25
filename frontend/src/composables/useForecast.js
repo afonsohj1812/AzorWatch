@@ -7,11 +7,12 @@ import {
   overlayUrl,
   pointUrl,
   demUrl,
-  configUrl,
 } from "../api";
 import { createFogMath, FOG_CLASS_NAMES, OCEAN } from "../services/fogMath";
+import { parseDem } from "../services/demFormat";
 import { createSeaMath, nearestPoints, SEA_CLASS_NAMES } from "../services/seaMath";
 import { OVERALL, isSurfaceLayer, renderLayer } from "../layers";
+import model from "../config/model.json";
 
 const DEFAULT_ISLAND = "terceira";
 const DEFAULT_MODE = "fog";
@@ -26,53 +27,10 @@ function fetchDem(url) {
       url,
       fetch(url)
         .then((res) => res.arrayBuffer())
-        .then((buffer) => {
-          const headerLength = new DataView(buffer).getUint32(0, true);
-          const header = JSON.parse(
-            new TextDecoder().decode(new Uint8Array(buffer, 4, headerLength)),
-          );
-
-          const cells = header.width * header.height;
-          const base = 4 + headerLength;
-
-          return {
-            ...header,
-            elevation: new Int16Array(buffer, base, cells),
-            aspect: new Uint8Array(buffer, base + cells * 2, cells),
-            slope: new Uint8Array(buffer, base + cells * 3, cells),
-            coast: new Uint8Array(buffer, base + cells * 4, cells),
-          };
-        }),
+        .then((buffer) => parseDem(buffer)),
     );
 
   return demCache.get(url);
-}
-
-function coverAt(model, dem, points, hour, x, y) {
-  if (!points?.length) return null;
-
-  const source = model.fog.surface.layers.cloudCover.source;
-  const [west, south, east, north] = dem.bbox;
-  const lon = west + ((x + 0.5) / dem.width) * (east - west);
-  const lat = north - ((y + 0.5) / dem.height) * (north - south);
-
-  let value = 0;
-  let weight = 0;
-
-  for (const { index, weight: share } of nearestPoints(
-    lat,
-    lon,
-    points,
-    model.sea.neighbors,
-    model.sea.idwPower,
-  )) {
-    const reading = points[index][source]?.[hour];
-    if (!Number.isFinite(reading)) continue;
-    value += reading * share;
-    weight += share;
-  }
-
-  return weight ? Math.round(value / weight) : null;
 }
 
 const azoresHour = () =>
@@ -272,17 +230,10 @@ export function useForecast() {
   let pending = null;
   let lastCall = 0;
 
-  let config = null;
   let fogMath = null;
   let seaMath = null;
 
-  async function loadConfig() {
-    config ??= await (await fetch(configUrl())).json();
-    return config;
-  }
-
   async function inspectFogLocally(x, y) {
-    const model = await loadConfig();
     fogMath ??= createFogMath(model);
 
     const dem = await fetchDem(demUrl(islandId.value));
@@ -316,7 +267,6 @@ export function useForecast() {
   }
 
   async function inspectSeaLocally(x, y) {
-    const model = await loadConfig();
     seaMath ??= createSeaMath(model);
 
     const dem = await fetchDem(demUrl(islandId.value));
@@ -335,90 +285,35 @@ export function useForecast() {
     const lon = west + ((x + 0.5) / dem.width) * (east - west);
     const lat = north - ((y + 0.5) / dem.height) * (north - south);
 
-    const points = forecast.value.points;
-    const blend = nearestPoints(
-      lat,
-      lon,
-      points,
-      model.sea.neighbors,
-      model.sea.idwPower,
-    );
-
-    const at = dayIndex.value * HOURS_PER_DAY + hourIndex.value;
-    const layers = {};
-
-    for (const name of Object.keys(points[0].layers)) {
-      let value = 0;
-      let weight = 0;
-
-      for (const { index: p, weight: w } of blend) {
-        const reading = points[p].layers[name][at];
-        if (reading === null) continue;
-        value += reading * w;
-        weight += w;
-      }
-
-      layers[name] = weight ? value / weight : null;
-    }
-
-    layers.visibility = seaMath.shoreAdjusted(
-      layers.visibility,
-      dem.coast[index] * model.cellSize,
-    );
-
-    const gx = ((dem.coast[index + 1] ?? 0) - (dem.coast[index - 1] ?? 0)) / 2;
-    const gy =
-      ((dem.coast[index + dem.width] ?? 0) -
-        (dem.coast[index - dem.width] ?? 0)) /
-      2;
-
+    const gx = (dem.coast[index + 1] - dem.coast[index - 1]) / 2;
+    const gy = (dem.coast[index + dem.width] - dem.coast[index - dem.width]) / 2;
     const bearing = Math.atan2(gx, -gy);
-    const nx = gx === 0 && gy === 0 ? 0 : Math.cos(bearing);
-    const ny = gx === 0 && gy === 0 ? 0 : Math.sin(bearing);
+    const flat = gx === 0 && gy === 0;
 
-    let sum = 0;
-    let used = 0;
-    const directions = {};
-
-    for (const [name, spec] of Object.entries(model.sea.layers)) {
-      let reading = layers[name];
-      if (!Number.isFinite(reading)) continue;
-
-      if (name in model.sea.exposure) {
-        let fx = 0;
-        let fy = 0;
-        for (const { index: p, weight: w } of blend) {
-          const degrees = points[p].directions?.[name]?.[at];
-          if (!Number.isFinite(degrees)) continue;
-          const d = (degrees * Math.PI) / 180;
-          fx += Math.cos(d) * w;
-          fy += Math.sin(d) * w;
-        }
-
-        directions[name] =
-          fx === 0 && fy === 0
-            ? null
-            : Math.round(((Math.atan2(fy, fx) * 180) / Math.PI + 360) % 360);
-
-        reading = seaMath.exposed(reading, name, fx * nx + fy * ny);
-        layers[name] = reading;
-      }
-
-      sum +=
-        seaMath.normalize(reading, spec.perfect, spec.undivable) * spec.weight;
-      used += spec.weight;
-    }
-
-    const score = used ? sum / used : 1;
-
-    layers.clarity = seaMath.clarityMeters(layers.visibility);
+    const points = forecast.value.points;
+    const { score, values, directions } = seaMath.scoreCell(
+      points,
+      nearestPoints(
+        lat,
+        lon,
+        points,
+        model.sea.neighbors,
+        model.sea.idwPower,
+      ),
+      dayIndex.value * HOURS_PER_DAY + hourIndex.value,
+      {
+        coastMeters: dem.coast[index] * model.cellSize,
+        normalX: flat ? 0 : Math.cos(bearing),
+        normalY: flat ? 0 : Math.sin(bearing),
+      },
+    );
 
     return {
       ...base,
       offshore: false,
       class: SEA_CLASS_NAMES[seaMath.classify(score)],
       score,
-      layers,
+      layers: values,
       directions,
     };
   }

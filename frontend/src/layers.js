@@ -13,9 +13,9 @@ const PALETTE = SEA_CLASS_NAMES.map(
 
 export const OVERALL = "overall";
 
-export const SURFACE_LAYERS = model.fog.surface.layers;
+const SURFACE_LAYERS = model.fog.surface.layers;
 
-export const FOG_LAYERS = [
+const FOG_LAYERS = [
   { id: OVERALL, label: "Overall" },
   ...Object.entries(SURFACE_LAYERS).map(([id, spec]) => ({
     id,
@@ -27,7 +27,7 @@ export const isSurfaceLayer = (layer) => layer in SURFACE_LAYERS;
 
 const RAMP = model.fog.surface.ramp.map((id) => model.classes[id].rgb);
 
-export const rampBin = (value, spec) => {
+const rampBin = (value, spec) => {
   const span = spec.max - spec.min;
   const fraction = span === 0 ? 0 : (value - spec.min) / span;
   return Math.min(
@@ -36,7 +36,7 @@ export const rampBin = (value, spec) => {
   );
 };
 
-export const SEA_LAYERS = [
+const SEA_LAYERS = [
   { id: OVERALL, label: "Overall" },
   { id: "wave", label: "Waves" },
   { id: "visibility", label: "Visibility" },
@@ -72,10 +72,12 @@ async function maskFor(id, url) {
     const { data } = context.getImageData(0, 0, image.width, image.height);
     const pixels = [];
     const shore = [];
+    const bearing = [];
     for (let i = 0; i < image.width * image.height; i++) {
       if (data[i * 4 + 3] === 0) continue;
       pixels.push(i);
       shore.push(data[i * 4] * model.cellSize);
+      bearing.push((data[i * 4 + 1] * 2 * Math.PI) / 180);
     }
 
     return {
@@ -83,6 +85,7 @@ async function maskFor(id, url) {
       height: image.height,
       pixels: Int32Array.from(pixels),
       shore: Float32Array.from(shore),
+      bearing: Float32Array.from(bearing),
     };
   });
 
@@ -118,8 +121,7 @@ function blendFor(id, mask, bbox, points) {
   return blend;
 }
 
-function paintSurface(mask, blend, points, layer, hour) {
-  const spec = SURFACE_LAYERS[layer];
+function paint(mask, colorAt) {
   const canvas = document.createElement("canvas");
   canvas.width = mask.width;
   canvas.height = mask.height;
@@ -128,65 +130,14 @@ function paintSurface(mask, blend, points, layer, hour) {
   const image = context.createImageData(mask.width, mask.height);
 
   for (let j = 0; j < mask.pixels.length; j++) {
-    let value = 0;
-    let weight = 0;
-
-    for (const { index, weight: share } of blend[j]) {
-      const reading = points[index][spec.source]?.[hour];
-      if (!Number.isFinite(reading)) continue;
-      value += reading * share;
-      weight += share;
-    }
-    if (!weight) continue;
-
-    const [r, g, b, a] = RAMP[rampBin(value / weight, spec)];
-    const p = mask.pixels[j] * 4;
-    image.data[p] = r;
-    image.data[p + 1] = g;
-    image.data[p + 2] = b;
-    image.data[p + 3] = a;
-  }
-
-  context.putImageData(image, 0, 0);
-  return new Promise((resolve) =>
-    canvas.toBlob((blob) => resolve(URL.createObjectURL(blob)), "image/png"),
-  );
-}
-
-function paint(mask, blend, points, layer, hour) {
-  const spec = model.sea.layers[layer];
-  const canvas = document.createElement("canvas");
-  canvas.width = mask.width;
-  canvas.height = mask.height;
-
-  const context = canvas.getContext("2d");
-  const image = context.createImageData(mask.width, mask.height);
-
-  for (let j = 0; j < mask.pixels.length; j++) {
-    let value = 0;
-    let weight = 0;
-
-    for (const { index, weight: share } of blend[j]) {
-      const reading = points[index].layers[layer][hour];
-      if (reading === null) continue;
-      value += reading * share;
-      weight += share;
-    }
-    if (!weight) continue;
-
-    const reading =
-      layer === "visibility"
-        ? math.shoreAdjusted(value / weight, mask.shore[j])
-        : value / weight;
-
-    const normalized = math.normalize(reading, spec.perfect, spec.undivable);
-    const [r, g, b, a] = PALETTE[math.classify(normalized)];
+    const rgb = colorAt(j);
+    if (!rgb) continue;
 
     const p = mask.pixels[j] * 4;
-    image.data[p] = r;
-    image.data[p + 1] = g;
-    image.data[p + 2] = b;
-    image.data[p + 3] = a;
+    image.data[p] = rgb[0];
+    image.data[p + 1] = rgb[1];
+    image.data[p + 2] = rgb[2];
+    image.data[p + 3] = rgb[3];
   }
 
   context.putImageData(image, 0, 0);
@@ -204,7 +155,33 @@ export async function renderLayer({ id, bbox, points, layer, hour, maskUrl }) {
   if (!mask.pixels.length) return null;
 
   const blend = blendFor(key, mask, bbox, points);
-  return surface
-    ? paintSurface(mask, blend, points, layer, hour)
-    : paint(mask, blend, points, layer, hour);
+
+  if (surface) {
+    const spec = SURFACE_LAYERS[layer];
+    return paint(mask, (j) => {
+      let value = 0;
+      let weight = 0;
+      for (const { index, weight: share } of blend[j]) {
+        const reading = points[index][spec.source]?.[hour];
+        if (!Number.isFinite(reading)) continue;
+        value += reading * share;
+        weight += share;
+      }
+      return weight ? RAMP[rampBin(value / weight, spec)] : null;
+    });
+  }
+
+  const spec = model.sea.layers[layer];
+  return paint(mask, (j) => {
+    const { reading } = math.readingAt(points, blend[j], layer, hour, {
+      coastMeters: mask.shore[j],
+      normalX: Math.cos(mask.bearing[j]),
+      normalY: Math.sin(mask.bearing[j]),
+    });
+    if (reading === null) return null;
+
+    return PALETTE[
+      math.classify(math.normalize(reading, spec.perfect, spec.undivable))
+    ];
+  });
 }

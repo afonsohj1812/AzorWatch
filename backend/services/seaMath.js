@@ -1,5 +1,3 @@
-export const SEA_CLASS = { GREEN: 0, YELLOW: 1, ORANGE: 2, RED: 3 };
-
 export const SEA_CLASS_NAMES = ["green", "yellow", "orange", "red"];
 
 export const LAYER_SOURCES = {
@@ -172,22 +170,90 @@ export function createSeaMath(config) {
     return weights === 0 ? null : sum / weights;
   }
 
+  function blendAt(points, blend, name, hour) {
+    let value = 0;
+    let weight = 0;
+
+    for (const { index, weight: share } of blend) {
+      const reading = points[index].layers?.[name]?.[hour];
+      if (!Number.isFinite(reading)) continue;
+      value += reading * share;
+      weight += share;
+    }
+
+    return weight ? value / weight : null;
+  }
+
+  function facingAt(points, blend, name, hour, cell) {
+    let fx = 0;
+    let fy = 0;
+
+    for (const { index, weight: share } of blend) {
+      const degrees = points[index].directions?.[name]?.[hour];
+      if (!Number.isFinite(degrees)) continue;
+      const radians = (degrees * Math.PI) / 180;
+      fx += Math.cos(radians) * share;
+      fy += Math.sin(radians) * share;
+    }
+
+    return {
+      facing: fx * cell.normalX + fy * cell.normalY,
+      bearing:
+        fx === 0 && fy === 0
+          ? null
+          : Math.round(((Math.atan2(fy, fx) * 180) / Math.PI + 360) % 360),
+    };
+  }
+
+  function readingAt(points, blend, name, hour, cell) {
+    let reading = blendAt(points, blend, name, hour);
+    if (reading === null) return { reading: null, bearing: null };
+
+    if (name === "visibility")
+      reading = shoreAdjusted(reading, cell.coastMeters);
+
+    if (!(name in exposure)) return { reading, bearing: null };
+
+    const { facing, bearing } = facingAt(points, blend, name, hour, cell);
+    return { reading: exposed(reading, name, facing), bearing };
+  }
+
+  function scoreCell(points, blend, hour, cell) {
+    const values = {};
+    const directions = {};
+    let sum = 0;
+    let used = 0;
+
+    for (const [name, spec] of Object.entries(layers)) {
+      const { reading, bearing } = readingAt(points, blend, name, hour, cell);
+      if (reading === null) continue;
+
+      values[name] = reading;
+      if (bearing !== null) directions[name] = bearing;
+
+      sum += normalize(reading, spec.perfect, spec.undivable) * spec.weight;
+      used += spec.weight;
+    }
+
+    values.clarity = clarityMeters(values.visibility);
+    return { score: used ? sum / used : 1, values, directions };
+  }
+
   function classify(value) {
     if (value === null) return null;
-    if (value < classThresholds.green) return SEA_CLASS.GREEN;
-    if (value < classThresholds.yellow) return SEA_CLASS.YELLOW;
-    if (value < classThresholds.orange) return SEA_CLASS.ORANGE;
-    return SEA_CLASS.RED;
+    if (value < classThresholds.green) return 0;
+    if (value < classThresholds.yellow) return 1;
+    if (value < classThresholds.orange) return 2;
+    return 3;
   }
 
   return {
     normalize,
-    exposed,
     turbidityAt,
-    shoreAdjusted,
     clarityMeters,
     layerValues,
-    layerScores,
+    readingAt,
+    scoreCell,
     score,
     classify,
   };

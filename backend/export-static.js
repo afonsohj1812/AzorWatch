@@ -16,7 +16,6 @@ async function main() {
   await mkdir(`${OUT}/dem`, { recursive: true });
 
   await writeFile(`${OUT}/islands.json`, JSON.stringify(islands));
-  await copyFile("config/model.json", `${OUT}/config.json`);
   console.log(`islands.json  ${islands.length} islands`);
 
   const storedAt = new Date().toISOString();

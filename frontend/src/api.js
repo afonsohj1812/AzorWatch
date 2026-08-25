@@ -21,4 +21,3 @@ export const pointUrl = (mode, id, time, x, y) =>
     : url(`point/${id}/${time}?x=${x}&y=${y}`);
 
 export const demUrl = (id) => url(`dem/${id}.bin`);
-export const configUrl = () => url("config.json");

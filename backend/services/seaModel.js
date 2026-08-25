@@ -23,10 +23,6 @@ const PALETTE = SEA_CLASS_NAMES.map(
 
 const LAYER_NAMES = ["visibility", ...Object.keys(LAYER_SOURCES)];
 const DIRECTIONS = Object.keys(DIRECTION_SOURCES);
-const TOTAL_WEIGHT = Object.values(config.sea.layers).reduce(
-  (sum, spec) => sum + spec.weight,
-  0,
-);
 const SCORED_LAYERS = Object.entries(config.sea.layers);
 const CELL_SIZE = config.cellSize;
 const BAND_CELLS = Math.round(config.sea.bandMeters / config.cellSize);
@@ -137,6 +133,21 @@ function buildBlend(dem, points) {
   };
 }
 
+function cellBlend(blend, j, into) {
+  const base = j * blend.k;
+  for (let n = 0; n < blend.k; n++) {
+    into[n].index = blend.indices[base + n];
+    into[n].weight = blend.weights[base + n];
+  }
+  return into;
+}
+
+const cellAt = (blend, j) => ({
+  coastMeters: blend.shore[j],
+  normalX: blend.normalX[j],
+  normalY: blend.normalY[j],
+});
+
 function blendFor(id, dem, points) {
   const signature = points.map((p) => `${p.lat},${p.lon}`).join(" ");
   const cached = blends.get(id);
@@ -198,67 +209,17 @@ export function inspectSeaCell(dem, summary, hour, time, x, y) {
   const j = findCell(blend.cells, y * dem.width + x);
   if (j === -1) return { time, x, y, offshore: true };
 
-  const base = j * blend.k;
-  const layers = {};
+  const slots = Array.from({ length: blend.k }, () => ({
+    index: 0,
+    weight: 0,
+  }));
 
-  for (const name of LAYER_NAMES) {
-    let value = 0;
-    let weight = 0;
-
-    for (let n = 0; n < blend.k; n++) {
-      const reading = summary.points[blend.indices[base + n]].layers[name][hour];
-      if (reading === null) continue;
-      value += reading * blend.weights[base + n];
-      weight += blend.weights[base + n];
-    }
-
-    layers[name] = weight ? round(value / weight, 2) : null;
-  }
-
-  const facing = {};
-  const directions = {};
-  for (const name of DIRECTIONS) {
-    let fx = 0;
-    let fy = 0;
-    for (let n = 0; n < blend.k; n++) {
-      const degrees =
-        summary.points[blend.indices[base + n]].directions?.[name]?.[hour];
-      if (!Number.isFinite(degrees)) continue;
-      const radians = (degrees * Math.PI) / 180;
-      fx += Math.cos(radians) * blend.weights[base + n];
-      fy += Math.sin(radians) * blend.weights[base + n];
-    }
-    facing[name] = fx * blend.normalX[j] + fy * blend.normalY[j];
-    directions[name] =
-      fx === 0 && fy === 0
-        ? null
-        : Math.round(((Math.atan2(fy, fx) * 180) / Math.PI + 360) % 360);
-  }
-
-  layers.visibility = round(
-    math.shoreAdjusted(layers.visibility, blend.shore[j]),
-    2,
+  const { score, values, directions } = math.scoreCell(
+    summary.points,
+    cellBlend(blend, j, slots),
+    hour,
+    cellAt(blend, j),
   );
-
-  let sum = 0;
-  let used = 0;
-
-  for (const [name, spec] of SCORED_LAYERS) {
-    let reading = layers[name];
-    if (!Number.isFinite(reading)) continue;
-
-    if (name in facing) {
-      reading = math.exposed(reading, name, facing[name]);
-      layers[name] = round(reading, 2);
-    }
-
-    sum += math.normalize(reading, spec.perfect, spec.undivable) * spec.weight;
-    used += spec.weight;
-  }
-
-  const score = used ? sum / used : 1;
-
-  layers.clarity = round(math.clarityMeters(layers.visibility), 1);
 
   return {
     time,
@@ -268,7 +229,9 @@ export function inspectSeaCell(dem, summary, hour, time, x, y) {
     shore: Math.round(blend.shore[j]),
     class: SEA_CLASS_NAMES[math.classify(score)],
     score: round(score, 3),
-    layers,
+    layers: Object.fromEntries(
+      Object.entries(values).map(([k, v]) => [k, round(v, 2)]),
+    ),
     directions,
   };
 }
@@ -321,11 +284,8 @@ export async function buildSeaForecast(id, onOverlay) {
     ),
   }));
 
-  const readings = SCORED_LAYERS.map(() => new Float64Array(points.length));
-  const present = SCORED_LAYERS.map(() => new Uint8Array(points.length));
   const layerHourClass = SCORED_LAYERS.map(() => new Uint8Array(hours));
-  const dirX = DIRECTIONS.map(() => new Float64Array(points.length));
-  const dirY = DIRECTIONS.map(() => new Float64Array(points.length));
+  const slots = Array.from({ length: k }, () => ({ index: 0, weight: 0 }));
 
   for (let hour = 0; hour < hours; hour++) {
     const index = marine.historyHours + hour;
@@ -338,20 +298,11 @@ export async function buildSeaForecast(id, onOverlay) {
       for (const name of LAYER_NAMES)
         summaryPoints[p].layers[name][hour] = round(values[name], 2);
 
-      SCORED_LAYERS.forEach(([name], li) => {
-        const reading = values[name];
-        present[li][p] = Number.isFinite(reading) ? 1 : 0;
-        readings[li][p] = Number.isFinite(reading) ? reading : 0;
-      });
-
-      DIRECTIONS.forEach((name, di) => {
+      DIRECTIONS.forEach((name) => {
         const degrees = points[p][DIRECTION_SOURCES[name]]?.[index];
         summaryPoints[p].directions[name][hour] = Number.isFinite(degrees)
           ? Math.round(degrees)
           : null;
-        const radians = ((degrees ?? 0) * Math.PI) / 180;
-        dirX[di][p] = Number.isFinite(degrees) ? Math.cos(radians) : 0;
-        dirY[di][p] = Number.isFinite(degrees) ? Math.sin(radians) : 0;
       });
     }
 
@@ -361,52 +312,23 @@ export async function buildSeaForecast(id, onOverlay) {
     );
 
     for (let j = 0; j < cells.length; j++) {
-      const base = j * k;
+      const { score, values } = math.scoreCell(
+        summaryPoints,
+        cellBlend(blend, j, slots),
+        hour,
+        cellAt(blend, j),
+      );
 
-      const facing = DIRECTIONS.map((_, di) => {
-        let fx = 0;
-        let fy = 0;
-        for (let n = 0; n < k; n++) {
-          const p = indices[base + n];
-          fx += dirX[di][p] * weights[base + n];
-          fy += dirY[di][p] * weights[base + n];
-        }
-        return fx * normalX[j] + fy * normalY[j];
-      });
-
-      let sum = 0;
-      let used = 0;
-
-      for (let li = 0; li < SCORED_LAYERS.length; li++) {
-        let blended = 0;
-        let weight = 0;
-
-        for (let n = 0; n < k; n++) {
-          const p = indices[base + n];
-          if (!present[li][p]) continue;
-          blended += readings[li][p] * weights[base + n];
-          weight += weights[base + n];
-        }
-        if (!weight) continue;
-
-        const [name, spec] = SCORED_LAYERS[li];
-        let reading = blended / weight;
-
-        if (name === "visibility") reading = math.shoreAdjusted(reading, shore[j]);
-        const di = DIRECTIONS.indexOf(name);
-        if (di !== -1) reading = math.exposed(reading, name, facing[di]);
-
-        const normalized = math.normalize(reading, spec.perfect, spec.undivable);
-        layerCounts[li][math.classify(normalized)]++;
-
-        sum += normalized * spec.weight;
-        used += spec.weight;
-      }
-
-      const value = used ? sum / used : 1;
-      const seaClass = math.classify(value);
+      const seaClass = math.classify(score);
       classes[j] = seaClass;
       counts[seaClass]++;
+
+      SCORED_LAYERS.forEach(([name, spec], li) => {
+        if (!Number.isFinite(values[name])) return;
+        layerCounts[li][
+          math.classify(math.normalize(values[name], spec.perfect, spec.undivable))
+        ]++;
+      });
     }
 
     hourClass[hour] = percentileClass(counts, cells.length);
