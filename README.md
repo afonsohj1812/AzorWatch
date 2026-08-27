@@ -1,45 +1,66 @@
 # AzorWatch
 
-An app that predicts fog across the 9 Azores islands for today and the next 3 days in a 50×50m color-coded map (no fog / yellow / orange / red).
+Two forecasts for the 9 Azores islands, today and the next 3 days, on a 50×50m color-coded map:
+**Dive** conditions along the coast, and **Fog** over the land.
 
-**Live demo:** https://afonsohj1812.github.io/AzorWatch (rebuilt every 6 hours, so the forecast can be a few hours behind).
+**Live demo:** https://afonsohj1812.github.io/AzorWatch
 
-![Fog forecast over São Miguel](docs/preview.png)
+**Dive Mode:**
+![Dive conditions around São Miguel](docs/dive.png)
 
-## How it works
+**Fog Mode:**
+![Fog forecast over São Miguel](docs/fog.png)
 
-The forecast gives the height of the cloud base and the cloud top over each island. The elevation grid gives the height of the ground at every 50m cell. A cell is foggy when its elevation falls between the two, and the deeper it sits into the cloud, the lower the visibility.
+## Dive
 
-1. **Forecast.** One Open-Meteo request covers all nine islands: surface temperature, dew
-   point, wind and low cloud cover, plus temperature, humidity and height on seven pressure
-   levels from sea level to ~2000m.
-2. **Vertical structure.** From that profile, find where the air reaches saturation (the
-   cloud base) and where it dries out again (the cloud top). If low cloud cover is under
-   `cloudCover.minLow`, the hour is treated as cloudless and nothing is painted, however
-   humid the profile looks.
-3. **Terrain.** A 50m elevation grid per island, resampled from the Copernicus GLO-30 DEM.
-4. **Intersect.** For each cell, compare its elevation with the cloud layer. Below the base
-   is clear, inside it is fog that thickens with depth, above the top is clear again. That
-   last case is why Pico's summit often stands in sunshine while its flanks are socked in.
-5. **Store.** An hourly job runs the four steps above for all nine islands, renders each
-   island-hour to a small transparent PNG, and writes the results to MongoDB.
-6. **Serve.** The API only reads from MongoDB, so no request ever runs the model. The
-   overlays are drawn over a satellite map.
+Scores the 1km band of sea around each island for spearfishing. Four layers, each scored from
+0 (perfect) to 1 (unusable) and combined by weight:
 
-Visibility inside cloud comes from the adiabatic liquid water profile via Kunkel's relation,
-bucketed into four classes:
+| layer      | from                              | perfect     |
+| ---------- | --------------------------------- | ----------- |
+| wave       | wave height, adjusted for shelter | small       |
+| visibility | wave stir, rain runoff, daylight  | clear water |
+| wind       | wind speed, adjusted for shelter  | calm        |
+| tide       | rate of tide change               | moving fast |
+
+Each cell knows which way its shore faces, so a swell running into the north coast scores worse
+there than on the sheltered south side. That is why the two coasts differ in the screenshot.
+Visibility decays from clear water as wave energy stirs the bottom, rain runs off the land, and
+the light drops.
+
+| class  | meaning   |
+| ------ | --------- |
+| red    | Undivable |
+| orange | Marginal  |
+| yellow | Divable   |
+| green  | Perfect   |
+
+## Fog
+
+The forecast gives the height of the cloud base and cloud top over each island, and the
+elevation grid gives the height of the ground at every 50m cell. A cell is foggy when its
+elevation falls between the two, and the deeper it sits into the cloud, the lower the
+visibility. That is why Pico's summit often stands in sunshine while its flanks are socked in.
+
+If low cloud cover is under `cloudCover.minLow`, the hour is treated as cloudless and nothing
+is painted, however humid the profile looks. Visibility inside cloud comes from the adiabatic
+liquid water profile via Kunkel's relation.
 
 | class  | visibility |
 | ------ | ---------- |
 | red    | 10m – 100m |
 | orange | 100m – 1km |
 | yellow | 1km – 10km |
-| none   | > 10 km    |
+| none   | > 10km     |
 
-Those colors describe a single 50m pixel. The hour ticks and day circles use the same colors
-for a different thing, how much of the island is affected: an hour is yellow past 25% of the
-land fogged, orange past 50% and red past 75%, and a day averages its 24 hours (red 3, orange
-2, yellow 1, none 0) and takes the whole part.
+## Both
+
+Those colors describe a single cell. The hour ticks and day circles use them for the island as a
+whole: fog by how much land is covered, dive by the condition a quarter of the band beats.
+
+An hourly job runs both models for all nine islands, renders every island-hour to a transparent
+PNG and writes it to MongoDB, individual dive layers included. The API only reads from MongoDB,
+so no request ever runs a model and switching layer or hour is just an image swap.
 
 ## Running it
 
@@ -53,65 +74,65 @@ Frontend on `localhost:5173`, backend on `localhost:3000`.
 
 ## API
 
-| endpoint                             | returns                                              |
-| ------------------------------------ | ---------------------------------------------------- |
-| `GET /api/islands`                   | island list with bounding boxes                      |
-| `GET /api/forecast/:island`          | 4 days × 24 hours of class, plus conditions (~18 KB) |
-| `GET /api/fog/:island/:hour.png`     | the overlay for one hour (1–30 KB)                   |
-| `GET /api/point/:island/:hour?x=&y=` | one cell: elevation, cloud base/top, visibility      |
+| endpoint                                 | returns                                      |
+| ---------------------------------------- | -------------------------------------------- |
+| `GET /api/islands`                       | island list with bounding boxes              |
+| `GET /api/forecast/:island`              | fog: 4 days × 24 hours of class              |
+| `GET /api/sea/:island`                   | dive: the same, plus a class per layer       |
+| `GET /api/fog/:island/:hour.png`         | fog overlay for one hour                     |
+| `GET /api/sea/:island/:hour.png`         | dive overlay for one hour                    |
+| `GET /api/sea/:island/:layer/:hour.png`  | one dive layer for one hour                  |
+| `GET /api/point/:island/:hour?x=&y=`     | one cell: elevation, cloud base/top          |
+| `GET /api/sea/point/:island/:hour?x=&y=` | one cell: every layer, its score and readout |
 
-The forecast summary and the pixels are separate on purpose. The summary is small and fetched
-once per island to color the day and hour controls, while the pixels are paged in one hour at
-a time as you scrub. Its `conditions` array also carries the cloud base, top and the depth
-thresholds, which is what lets the static build classify a single cell in the browser with no
-server behind it.
+Summaries and pixels are separate on purpose: a summary is fetched once per island to color the
+controls, the pixels are paged in an hour at a time as you scrub.
 
 ## Layout
 
 ```
 backend/
-  server.js                 the four routes, plus the hourly cron
+  server.js                 the routes, plus the hourly cron
   export-static.js          writes the API as files for Pages
   config/
     islands.js              the nine islands and their bounding boxes
     model.json              every tunable constant, and the class colors
   services/
-    fogMath.js              the model, pure and Node-free, shared with the browser
-    fogModel.js             binds fogMath to the DEM and forecast, renders PNGs, runs the pipeline
-    forecast.js             Open-Meteo fetch + cache
+    fogMath.js  seaMath.js  the models, pure and Node-free, shared with the browser
+    fogModel.js seaModel.js bind the models to the DEM and data, render the PNGs
+    layers/                 one file per dive layer: its inputs, penalty and readout
+    forecast.js surface.js  Open-Meteo fetches, cached
+    marine.js               wave, tide, wind at sea, and rain over the land
     dem.js                  builds the elevation grids, then loads them
     db.js                   every MongoDB read and write
 frontend/
   src/api.js                endpoint URLs, live or static
-  src/components/           map + the four control panels
+  src/components/           map, control panels, mobile menu
   src/composables/          data fetching and derived state
 ```
 
-`server.js` and `export-static.js` are the only two files you run. Everything else is imported.
+`server.js` and `export-static.js` are the only files you run. Adding a dive layer means one file
+in `services/layers/` and one entry in `model.json`.
 
-`fogMath.js` has no filesystem or network access on purpose: the frontend imports it directly,
-with `backend/services` and `backend/config` bind-mounted into the frontend container, so the
-fog model and the class colors exist once rather than twice.
+`fogMath.js` and `seaMath.js` have no filesystem or network access on purpose: the frontend
+imports them directly, with `backend/services` and `backend/config` bind-mounted into the
+frontend container, so the models and colors exist once rather than twice.
 
 ## Data
 
-- Forecast: [Open-Meteo](https://open-meteo.com), no API key.
+- Forecast and marine: [Open-Meteo](https://open-meteo.com), no API key.
 - Elevation: Copernicus GLO-30 DEM, public on AWS.
 - Basemap: Esri World Imagery.
 
 ## Limitations
 
-- **Cloud presence is a single number for the whole island.** The profile always yields a base
-  and a top, so `cloud_cover_low` is what decides whether any of it gets painted. That figure
-  is one percentage sampled at the island center for the whole 0–3km column: it says some low
-  cloud exists nearby, not that it sits at the modeled base, and not which part of the island
-  is under it. Above the threshold the entire island is painted, below it none of it is, so an
-  hour at 39% cover shows nothing and an hour at 40% shows everything. Partial cover is the
-  common case here and it is not rendered as partial.
+- **Neither model is validated.** Every constant in `config/model.json` is standard physics or a
+  plausible value chosen by hand. Nothing has been checked against observed fog, and the dive
+  weights were tuned against a few dives off Terceira.
+- **Shelter is not shadowing.** A cell knows which way its shore faces, not whether the island
+  blocks the swell, so a bay behind a headland can still score as exposed.
+- **Cloud cover is one number per island.** Above `cloudCover.minLow` the whole island is
+  painted, below it none of it is, so 24% cover shows nothing and 25% shows everything. Partial
+  cover is the common case here and is not drawn as partial.
 - **The pressure levels cannot resolve a low cloud base.** The lowest two are ~110m and ~320m,
-  and Azorean stratus routinely sits between them. Any base in that band is a straight-line
-  interpolation across a 210m gap, and below 110m the model can only fall back to the LCL.
-- **The model is not validated.** Every constant in `config/model.json` is either standard
-  physics or a plausible value chosen by hand and checked against a single day of output.
-  Nothing has been compared against observed fog. It is a physically reasoned estimate, not a
-  verified forecast.
+  and Azorean stratus routinely sits between them.
