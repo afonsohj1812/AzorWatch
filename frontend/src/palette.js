@@ -1,8 +1,8 @@
 import model from "./config/model.json";
 
 export const MODES = [
-  { id: "fog", label: "Fog" },
   { id: "sea", label: "Dive" },
+  { id: "fog", label: "Fog" },
 ];
 
 const resolve = (classes) =>

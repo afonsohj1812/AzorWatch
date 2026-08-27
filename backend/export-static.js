@@ -71,10 +71,14 @@ async function main() {
       await copyFile(`${DEM_DIR}/${file}`, `${OUT}/dem/${file}`);
   }
 
-  if (failed.size)
-    console.log(`\nincomplete: ${[...failed].join(", ")} could not be built`);
-
   console.log(`\nwrote to ${OUT}/`);
+
+  if (failed.size) {
+    console.error(
+      `\nincomplete: ${[...failed].join(", ")} could not be built, refusing to publish a partial site`,
+    );
+    process.exitCode = 1;
+  }
 }
 
 await main();

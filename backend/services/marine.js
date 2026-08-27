@@ -1,6 +1,7 @@
 import { readFileSync } from "node:fs";
 
 import { islands } from "../config/islands.js";
+import { fetchRetrying } from "./http.js";
 import { loadDem } from "./dem.js";
 
 const MARINE_API = "https://marine-api.open-meteo.com/v1/marine";
@@ -129,9 +130,7 @@ async function fetchSeries(api, variables, requests, selection) {
     ...(selection ? { cell_selection: selection } : {}),
   });
 
-  const res = await fetch(`${api}?${params}`);
-  if (!res.ok) throw new Error(`${api} HTTP ${res.status}`);
-
+  const res = await fetchRetrying(`${api}?${params}`, api);
   const body = await res.json();
   const entries = Array.isArray(body) ? body : [body];
   if (entries.length !== requests.length) {

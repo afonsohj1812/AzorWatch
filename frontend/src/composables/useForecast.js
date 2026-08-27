@@ -15,7 +15,7 @@ import { OVERALL, isSurfaceLayer, renderLayer } from "../layers";
 import model from "../config/model.json";
 
 const DEFAULT_ISLAND = "terceira";
-const DEFAULT_MODE = "fog";
+const DEFAULT_MODE = "sea";
 const PIPELINE_LAG_MS = 90_000;
 const HOURS_PER_DAY = 24;
 

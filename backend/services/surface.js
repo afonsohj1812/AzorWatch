@@ -1,6 +1,7 @@
 import { readFileSync } from "node:fs";
 
 import { islands } from "../config/islands.js";
+import { fetchRetrying } from "./http.js";
 import { loadDem } from "./dem.js";
 
 const API = "https://api.open-meteo.com/v1/forecast";
@@ -77,9 +78,7 @@ async function fetchAll() {
     timezone: TIMEZONE,
   });
 
-  const res = await fetch(`${API}?${params}`);
-  if (!res.ok) throw new Error(`Open-Meteo surface HTTP ${res.status}`);
-
+  const res = await fetchRetrying(`${API}?${params}`, "Open-Meteo surface");
   const body = await res.json();
   const entries = Array.isArray(body) ? body : [body];
   if (entries.length !== requests.length) {
