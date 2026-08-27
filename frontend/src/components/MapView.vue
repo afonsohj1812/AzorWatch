@@ -38,24 +38,8 @@ function fitIsland(animate = false) {
   else map.fitBounds(bounds, { padding });
 }
 
-const WHEEL_PX_PER_ZOOM = 60;
-let wheelDistance = 0;
-
-function zoomBy(levels, pointer) {
-  if (!map) return;
-  map.setZoomAround(pointer, map.getZoom() + levels);
-}
-
-function onWheel(event) {
-  if (!map || !props.island) return;
-  event.preventDefault();
-
-  wheelDistance += event.deltaY;
-  const steps = Math.trunc(wheelDistance / WHEEL_PX_PER_ZOOM);
-  if (!steps) return;
-
-  wheelDistance -= steps * WHEEL_PX_PER_ZOOM;
-  zoomBy(-steps, map.mouseEventToLatLng(event));
+function settleZoom() {
+  if (map?._animatingZoom) map._onZoomTransitionEnd?.();
 }
 
 function showOverlay() {
@@ -144,8 +128,9 @@ onMounted(async () => {
   map = L.map(container.value, {
     attributionControl: false,
     zoomControl: false,
-    scrollWheelZoom: false,
-    doubleClickZoom: false,
+    zoomSnap: 0.25,
+    wheelPxPerZoomLevel: 120,
+    wheelDebounceTime: 20,
   }).setView([38.5, -28.2], 8);
 
   L.tileLayer(
@@ -153,6 +138,8 @@ onMounted(async () => {
     {
       maxNativeZoom: 18,
       maxZoom: 21,
+      keepBuffer: 4,
+      updateWhenZooming: false,
       attribution:
         "Tiles &copy; Esri — Source: Esri, Maxar, Earthstar Geographics and the GIS User Community",
     },
@@ -166,11 +153,12 @@ onMounted(async () => {
     moving = false;
   });
 
+  container.value.addEventListener("pointerdown", settleZoom);
+
   map.on("mousemove", onMapMove);
   map.on("mouseout", clearCell);
   map.on("click", onMapMove);
-  map.on("dblclick", (event) => zoomBy(1, event.latlng));
-  container.value.addEventListener("wheel", onWheel, { passive: false });
+
 
   await nextTick();
   map.invalidateSize();
@@ -179,7 +167,7 @@ onMounted(async () => {
 });
 
 onBeforeUnmount(() => {
-  container.value?.removeEventListener("wheel", onWheel);
+  container.value?.removeEventListener("pointerdown", settleZoom);
   map?.remove();
   map = null;
   overlay = null;
