@@ -1,15 +1,30 @@
+import { degreesToVector } from "./curve.js";
+import { LAYERS } from "./layers/index.js";
+
 export const SEA_CLASS_NAMES = ["green", "yellow", "orange", "red"];
 
-export const LAYER_SOURCES = {
-  wave: "wave_height",
-  wind: "wind_speed_10m",
-  tide: "sea_level_height_msl",
-};
+export const LAYER_SOURCES = Object.fromEntries(
+  LAYERS.filter((layer) => layer.source).map((layer) => [
+    layer.id,
+    layer.source,
+  ]),
+);
 
-export const DIRECTION_SOURCES = {
-  wave: "wave_direction",
-  wind: "wind_direction_10m",
-};
+export const DIRECTION_SOURCES = Object.fromEntries(
+  LAYERS.filter((layer) => layer.direction).map((layer) => [
+    layer.id,
+    layer.direction,
+  ]),
+);
+
+export const SERIES = LAYERS.flatMap((layer) =>
+  Object.keys(layer.series ?? {}).map((name) => [name, layer]),
+);
+
+export const LAYER_LABELS = LAYERS.map((layer) => ({
+  id: layer.id,
+  label: layer.label,
+}));
 
 export function nearestPoints(lat, lon, points, count, power) {
   const scale = Math.cos((lat * Math.PI) / 180);
@@ -39,161 +54,45 @@ export function nearestPoints(lat, lon, points, count, power) {
 }
 
 export function createSeaMath(config) {
-  const { layers, turbidity, shore, exposure, classThresholds } = config.sea;
+  const { layers, exposure, classThresholds } = config.sea;
 
-  function normalize(value, perfect, undivable) {
-    if (!Number.isFinite(value)) return null;
+  for (const id of Object.keys(layers))
+    if (!LAYERS.some((layer) => layer.id === id))
+      throw new Error(`model.json configures unknown sea layer "${id}"`);
 
-    const span = undivable - perfect;
-    if (span === 0) return 0;
+  const active = LAYERS.filter((layer) => layers[layer.id]);
+  const SCALE = active.reduce((sum, layer) => sum + layers[layer.id].weight, 0);
 
-    return Math.min(1, Math.max(0, (value - perfect) / span));
-  }
-
-  function decayed(series, index, hours, halfLife, average) {
-    let sum = 0;
-    let weights = 0;
-
-    for (let back = 0; back < hours; back++) {
-      const i = index - back;
-      if (i < 0) break;
-
-      const value = series?.[i];
-      if (!Number.isFinite(value)) continue;
-
-      const weight = Math.pow(0.5, back / halfLife);
-      sum += value * weight;
-      weights += weight;
-    }
-
-    if (!weights) return null;
-    return average ? sum / weights : sum;
-  }
-
-  function turbidityAt(sample, index) {
-    const stirred = decayed(
-      sample.wave_height,
-      index,
-      turbidity.stirHours,
-      turbidity.stirHalfLife,
-      true,
-    );
-    const chopped = decayed(
-      sample.wind_wave_height,
-      index,
-      turbidity.chopHours,
-      turbidity.chopHalfLife,
-      true,
-    );
-    const rained = decayed(
-      sample.precipitation,
-      index,
-      turbidity.runoffHours,
-      turbidity.runoffHalfLife,
-      false,
-    );
-
-    const stir =
-      normalize(stirred, turbidity.waveClear, turbidity.waveMurky) ?? 0;
-    const chop =
-      normalize(chopped, turbidity.chopClear, turbidity.chopMurky) ?? 0;
-    const runoff =
-      normalize(rained, turbidity.rainClear, turbidity.rainMurky) ?? 0;
-    const gloom =
-      normalize(
-        sample.shortwave_radiation?.[index],
-        turbidity.lightClear,
-        turbidity.lightMurky,
-      ) ?? 0;
-
-    return Math.min(
-      1,
-      turbidity.stirWeight * stir +
-        turbidity.chopWeight * chop +
-        turbidity.runoffWeight * runoff +
-        turbidity.lightWeight * gloom,
-    );
-  }
-
-  function exposed(value, name, facing) {
-    const weight = exposure[name];
-    if (!Number.isFinite(value) || !weight || !facing) return value;
-
-    return Math.max(0, value * (1 + weight * facing));
-  }
-
-  function shoreAdjusted(value, coastMeters) {
-    if (!Number.isFinite(value)) return value;
-
-    const near = normalize(coastMeters, shore.clearMeters, 0) ?? 0;
-    return value + (1 - value) * shore.weight * near;
-  }
-
-  function clarityMeters(value) {
-    if (!Number.isFinite(value)) return null;
-
-    const { clearMeters, murkyMeters } = turbidity;
-    return clearMeters * Math.pow(murkyMeters / clearMeters, value);
-  }
-
-  function layerValues(sample, index) {
-    const values = { visibility: turbidityAt(sample, index) };
-
-    for (const [name, source] of Object.entries(LAYER_SOURCES))
-      values[name] = sample[source]?.[index] ?? null;
-
+  function seriesFor(point, index) {
+    const values = {};
+    for (const [name, layer] of SERIES)
+      values[name] = layer.series[name](point, index, layers[layer.id]);
     return values;
   }
 
-  function layerScores(sample, index) {
-    const values = layerValues(sample, index);
-    const scores = {};
-
-    for (const [name, spec] of Object.entries(layers))
-      scores[name] = normalize(values[name], spec.perfect, spec.undivable);
-
-    return scores;
-  }
-
-  function score(sample, index) {
-    const scores = layerScores(sample, index);
-
-    let sum = 0;
-    let weights = 0;
-
-    for (const [name, spec] of Object.entries(layers)) {
-      if (scores[name] === null) continue;
-      sum += scores[name] * spec.weight;
-      weights += spec.weight;
-    }
-
-    return weights === 0 ? null : sum / weights;
-  }
-
-  function blendAt(points, blend, name, hour) {
+  function blend(points, weights, pick) {
     let value = 0;
-    let weight = 0;
+    let share = 0;
 
-    for (const { index, weight: share } of blend) {
-      const reading = points[index].layers?.[name]?.[hour];
+    for (const { index, weight } of weights) {
+      const reading = pick(points[index]);
       if (!Number.isFinite(reading)) continue;
-      value += reading * share;
-      weight += share;
+      value += reading * weight;
+      share += weight;
     }
 
-    return weight ? value / weight : null;
+    return share ? value / share : null;
   }
 
-  function facingAt(points, blend, name, hour, cell) {
+  function facingOf(points, weights, id, hour, cell) {
     let fx = 0;
     let fy = 0;
 
-    for (const { index, weight: share } of blend) {
-      const degrees = points[index].directions?.[name]?.[hour];
-      if (!Number.isFinite(degrees)) continue;
-      const radians = (degrees * Math.PI) / 180;
-      fx += Math.cos(radians) * share;
-      fy += Math.sin(radians) * share;
+    for (const { index, weight } of weights) {
+      const vector = degreesToVector(points[index].directions?.[id]?.[hour]);
+      if (!vector) continue;
+      fx += vector[0] * weight;
+      fy += vector[1] * weight;
     }
 
     return {
@@ -205,38 +104,56 @@ export function createSeaMath(config) {
     };
   }
 
-  function readingAt(points, blend, name, hour, cell) {
-    let reading = blendAt(points, blend, name, hour);
-    if (reading === null) return { reading: null, bearing: null };
+  function cellFor(points, weights, hour, place) {
+    const cell = { shore: place.coastMeters, waveFacing: 0.5 };
 
-    if (name === "visibility")
-      reading = shoreAdjusted(reading, cell.coastMeters);
+    for (const layer of active) {
+      if (layer.source)
+        cell[layer.id] = blend(points, weights, (p) => p.layers?.[layer.id]?.[hour]);
 
-    if (!(name in exposure)) return { reading, bearing: null };
+      for (const name of Object.keys(layer.series ?? {}))
+        cell[name] = blend(points, weights, (p) => p.series?.[name]?.[hour]);
 
-    const { facing, bearing } = facingAt(points, blend, name, hour, cell);
-    return { reading: exposed(reading, name, facing), bearing };
-  }
+      if (!layer.direction) continue;
 
-  function scoreCell(points, blend, hour, cell) {
-    const values = {};
-    const directions = {};
-    let sum = 0;
-    let used = 0;
+      const { facing, bearing } = facingOf(points, weights, layer.id, hour, place);
+      cell[`${layer.id}Facing`] = (facing + 1) / 2;
+      cell[`${layer.id}Bearing`] = bearing;
 
-    for (const [name, spec] of Object.entries(layers)) {
-      const { reading, bearing } = readingAt(points, blend, name, hour, cell);
-      if (reading === null) continue;
-
-      values[name] = reading;
-      if (bearing !== null) directions[name] = bearing;
-
-      sum += normalize(reading, spec.perfect, spec.undivable) * spec.weight;
-      used += spec.weight;
+      if (layer.exposed && Number.isFinite(cell[layer.id]))
+        cell[layer.id] = Math.max(
+          0,
+          cell[layer.id] * (1 + exposure[layer.id] * facing),
+        );
     }
 
-    values.clarity = clarityMeters(values.visibility);
-    return { score: used ? sum / used : 1, values, directions };
+    return cell;
+  }
+
+  function scoreCell(points, weights, hour, place) {
+    const cell = cellFor(points, weights, hour, place);
+
+    let sum = 0;
+    for (const layer of active)
+      sum += layer.penalty(cell, layers[layer.id]) * layers[layer.id].weight;
+
+    return { score: sum / SCALE, cell };
+  }
+
+  function describe(cell) {
+    return active.map((layer) => ({
+      id: layer.id,
+      label: layer.label,
+      penalty: layer.penalty(cell, layers[layer.id]),
+      weight: layers[layer.id].weight / SCALE,
+      readout: layer.readout?.(cell, layers[layer.id]) ?? null,
+      bearing: cell[`${layer.id}Bearing`] ?? null,
+    }));
+  }
+
+  function penaltyOf(cell, id) {
+    const layer = active.find((entry) => entry.id === id);
+    return layer ? layer.penalty(cell, layers[id]) : null;
   }
 
   function classify(value) {
@@ -247,14 +164,5 @@ export function createSeaMath(config) {
     return 3;
   }
 
-  return {
-    normalize,
-    turbidityAt,
-    clarityMeters,
-    layerValues,
-    readingAt,
-    scoreCell,
-    score,
-    classify,
-  };
+  return { seriesFor, cellFor, scoreCell, describe, penaltyOf, classify };
 }

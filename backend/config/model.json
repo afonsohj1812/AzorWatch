@@ -30,7 +30,6 @@
     "summary": { "coverage": { "yellow": 0.25, "orange": 0.5, "red": 0.75 } },
 
     "surface": {
-      "sampleGridDegrees": 0.0703125,
       "ramp": ["green", "yellow", "orange", "red"],
       "layers": {
         "cloudCover": {
@@ -53,47 +52,29 @@
 
   "sea": {
     "bandMeters": 1000,
-    "sampleGridDegrees": 0.0833333,
 
     "layers": {
-      "wave": { "perfect": 0.3, "undivable": 2.0, "weight": 3.0 },
-      "visibility": { "perfect": 0, "undivable": 1, "weight": 2.0 },
-      "wind": { "perfect": 8, "undivable": 30, "weight": 2.5 },
-      "tide": { "perfect": 0.3, "undivable": -0.9, "weight": 2.0 }
+      "wave": { "weight": 3.0, "perfect": 0.5, "undivable": 2.0 },
+      "visibility": {
+        "weight": 2.0,
+        "perfect": 20,
+        "undivable": 4,
+        "clear": 30,
+        "atOneMeter": 18.6,
+        "shoreRange": 1500,
+        "shoreWeight": 0.5,
+        "minExposure": 0.25,
+        "stir": { "weight": 1, "hours": 24, "decay": 0.9 },
+        "runoff": { "weight": 2, "hours": 48, "decay": 0.95 },
+        "light": { "weight": 0.3, "from": 400, "to": 20 }
+      },
+      "wind": { "weight": 2.5, "perfect": 0, "undivable": 60 },
+      "tide": { "weight": 2.0, "perfect": 0.25, "undivable": 0 }
     },
 
-    "exposure": { "wave": 0.4, "wind": 0.5 },
+    "exposure": { "wave": 0.5, "wind": 0.5 },
 
-    "turbidity": {
-      "stirHours": 12,
-      "stirHalfLife": 6,
-      "stirWeight": 0.45,
-      "waveClear": 0.3,
-      "waveMurky": 4.0,
-
-      "chopHours": 8,
-      "chopHalfLife": 4,
-      "chopWeight": 0.2,
-      "chopClear": 0.05,
-      "chopMurky": 0.8,
-
-      "runoffHours": 24,
-      "runoffHalfLife": 12,
-      "runoffWeight": 0.2,
-      "rainClear": 0,
-      "rainMurky": 10,
-
-      "lightWeight": 0.15,
-      "lightClear": 400,
-      "lightMurky": 20,
-
-      "clearMeters": 30,
-      "murkyMeters": 2
-    },
-
-    "shore": { "weight": 0.18, "clearMeters": 600 },
-
-    "classThresholds": { "green": 0.2, "yellow": 0.4, "orange": 0.6 },
+    "classThresholds": { "green": 0.25, "yellow": 0.5, "orange": 0.75 },
     "summary": { "percentile": 0.25 },
     "neighbors": 3,
     "idwPower": 3,

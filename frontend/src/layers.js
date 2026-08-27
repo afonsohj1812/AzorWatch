@@ -1,6 +1,7 @@
 import model from "./config/model.json";
 import {
   createSeaMath,
+  LAYER_LABELS,
   nearestPoints,
   SEA_CLASS_NAMES,
 } from "./services/seaMath";
@@ -38,10 +39,7 @@ const rampBin = (value, spec) => {
 
 const SEA_LAYERS = [
   { id: OVERALL, label: "Overall" },
-  { id: "wave", label: "Waves" },
-  { id: "visibility", label: "Visibility" },
-  { id: "wind", label: "Wind" },
-  { id: "tide", label: "Tide" },
+  ...LAYER_LABELS.filter(({ id }) => model.sea.layers[id]),
 ];
 
 export const layersFor = (mode) => (mode === "sea" ? SEA_LAYERS : FOG_LAYERS);
@@ -171,17 +169,13 @@ export async function renderLayer({ id, bbox, points, layer, hour, maskUrl }) {
     });
   }
 
-  const spec = model.sea.layers[layer];
   return paint(mask, (j) => {
-    const { reading } = math.readingAt(points, blend[j], layer, hour, {
+    const cell = math.cellFor(points, blend[j], hour, {
       coastMeters: mask.shore[j],
       normalX: Math.cos(mask.bearing[j]),
       normalY: Math.sin(mask.bearing[j]),
     });
-    if (reading === null) return null;
 
-    return PALETTE[
-      math.classify(math.normalize(reading, spec.perfect, spec.undivable))
-    ];
+    return PALETTE[math.classify(math.penaltyOf(cell, layer))];
   });
 }

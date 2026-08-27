@@ -11,7 +11,9 @@ const { cellSize, forecastDays, sea } = JSON.parse(
 );
 
 const BAND_CELLS = Math.round(sea.bandMeters / cellSize);
-const GRID = sea.sampleGridDegrees;
+const MARINE_GRID_DEGREES = 1 / 12;
+
+const TIMEZONE = "Atlantic/Azores";
 
 const HOURS_PER_DAY = 24;
 const PAST_DAYS = 1;
@@ -28,13 +30,16 @@ const MARINE = [
 const WEATHER = [
   "wind_speed_10m",
   "wind_direction_10m",
-  "precipitation",
   "shortwave_radiation",
 ];
+
+const LAND = ["precipitation"];
+const LAND_GRID_METERS = 6000;
 
 const TTL_MS = 30 * 60_000;
 
 let sampled = null;
+let land = null;
 let cache = null;
 let inFlight = null;
 
@@ -58,10 +63,10 @@ async function samplePoints() {
       const lon = west + ((x + 0.5) / width) * (east - west);
       const lat = north - ((y + 0.5) / height) * (north - south);
 
-      const gx = Math.floor(lon / GRID);
-      const gy = Math.floor(lat / GRID);
-      const offLon = lon - (gx + 0.5) * GRID;
-      const offLat = lat - (gy + 0.5) * GRID;
+      const gx = Math.floor(lon / MARINE_GRID_DEGREES);
+      const gy = Math.floor(lat / MARINE_GRID_DEGREES);
+      const offLon = lon - (gx + 0.5) * MARINE_GRID_DEGREES;
+      const offLat = lat - (gy + 0.5) * MARINE_GRID_DEGREES;
       const offset = offLat * offLat + offLon * offLon;
 
       const key = `${gy}:${gx}`;
@@ -79,14 +84,49 @@ async function samplePoints() {
   return { requests, byIsland };
 }
 
-async function fetchSeries(api, variables, requests) {
+async function landPoints() {
+  const requests = [];
+  const byIsland = {};
+
+  for (const island of islands) {
+    const dem = await loadDem(island.id);
+    const { width, height, elevation, ocean, bbox } = dem;
+    const [west, south, east, north] = bbox;
+    const step = Math.round(LAND_GRID_METERS / cellSize);
+
+    byIsland[island.id] = [];
+
+    for (let y = (step / 2) | 0; y < height; y += step) {
+      for (let x = (step / 2) | 0; x < width; x += step) {
+        if (elevation[y * width + x] === ocean) continue;
+
+        byIsland[island.id].push(requests.length);
+        requests.push({
+          lat: north - ((y + 0.5) / height) * (north - south),
+          lon: west + ((x + 0.5) / width) * (east - west),
+        });
+      }
+    }
+
+    if (!byIsland[island.id].length) {
+      const [lat, lon] = island.center;
+      byIsland[island.id].push(requests.length);
+      requests.push({ lat, lon });
+    }
+  }
+
+  return { requests, byIsland };
+}
+
+async function fetchSeries(api, variables, requests, selection) {
   const params = new URLSearchParams({
     latitude: requests.map((p) => p.lat.toFixed(4)).join(","),
     longitude: requests.map((p) => p.lon.toFixed(4)).join(","),
     hourly: variables.join(","),
     past_days: String(PAST_DAYS),
     forecast_days: String(forecastDays),
-    timezone: "auto",
+    timezone: TIMEZONE,
+    ...(selection ? { cell_selection: selection } : {}),
   });
 
   const res = await fetch(`${api}?${params}`);
@@ -115,11 +155,14 @@ const usable = (series) => series.some((value) => Number.isFinite(value));
 
 async function fetchAll() {
   sampled ??= await samplePoints();
+  land ??= await landPoints();
+
   const { requests, byIsland } = sampled;
 
-  const [marine, weather] = await Promise.all([
+  const [marine, weather, rain] = await Promise.all([
     fetchSeries(MARINE_API, MARINE, requests),
-    fetchSeries(WEATHER_API, WEATHER, requests),
+    fetchSeries(WEATHER_API, WEATHER, requests, "sea"),
+    fetchSeries(WEATHER_API, LAND, land.requests, "land"),
   ]);
 
   if (marine[0].hourly.time[0] !== weather[0].hourly.time[0]) {
@@ -132,6 +175,22 @@ async function fetchAll() {
   let dropped = 0;
 
   for (const island of islands) {
+    const onLand = land.byIsland[island.id];
+    const hours = rain[0].hourly.time.length;
+    const precipitation = new Array(hours);
+
+    for (let h = 0; h < hours; h++) {
+      let sum = 0;
+      let seenCount = 0;
+      for (const index of onLand) {
+        const value = rain[index].hourly.precipitation[h];
+        if (!Number.isFinite(value)) continue;
+        sum += value;
+        seenCount++;
+      }
+      precipitation[h] = seenCount ? sum / seenCount : 0;
+    }
+
     const points = [];
     const seen = new Set();
 
@@ -151,7 +210,15 @@ async function fetchAll() {
       if (seen.has(key)) continue;
       seen.add(key);
 
-      points.push({ lat: entry.latitude, lon: entry.longitude, ...series });
+      points.push({
+        lat: entry.latitude,
+        lon: entry.longitude,
+        ...series,
+        precipitation,
+        energy: series.wave_height.map((v) =>
+          Number.isFinite(v) ? v * v : null,
+        ),
+      });
     }
 
     if (!points.length)

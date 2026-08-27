@@ -26,38 +26,7 @@ const depthText = computed(() => {
     : `${metres(-p.depth)} below the base`;
 });
 
-const FORMAT = {
-  wave: (v) => `${v.toFixed(1)}m`,
-  tide: (v) => `${v > 0 ? "+" : ""}${v.toFixed(2)}m`,
-  wind: (v) => `${Math.round(v)}km/h`,
-  clarity: (v) => `${Math.round(v)}m`,
-};
-
-const SEA_GROUPS = [
-  { label: "Waves", main: "wave", direction: "wave" },
-  { label: "Wind", main: "wind", direction: "wind" },
-  { label: "Tide", main: "tide" },
-  { label: "Visibility", main: "clarity" },
-];
-
-const seaGroups = computed(() => {
-  const layers = props.point?.layers;
-  if (!layers) return [];
-
-  const directions = props.point?.directions ?? {};
-
-  return SEA_GROUPS.filter((group) => Number.isFinite(layers[group.main])).map(
-    (group) => {
-      const bearing = directions[group.direction];
-
-      return {
-        label: group.label,
-        value: FORMAT[group.main](layers[group.main]),
-        bearing: Number.isFinite(bearing) ? bearing : null,
-      };
-    },
-  );
-});
+const seaRows = computed(() => props.point?.layers ?? []);
 </script>
 
 <template>
@@ -75,14 +44,20 @@ const seaGroups = computed(() => {
         </div>
 
         <dl class="detail">
-          <template v-for="group in seaGroups" :key="group.label">
-            <dt>{{ group.label }}</dt>
+          <template v-for="row in seaRows" :key="row.id">
+            <dt>{{ row.label }}</dt>
             <dd>
-              <span>{{ group.value }}</span>
+              <span class="bar">
+                <span
+                  class="fill"
+                  :style="{ width: `${row.penalty * row.weight * 100}%` }"
+                />
+              </span>
+              <span>{{ row.readout }}</span>
               <span
-                v-if="group.bearing !== null"
+                v-if="row.bearing !== null"
                 class="arrow"
-                :style="{ transform: `rotate(${group.bearing}deg)` }"
+                :style="{ transform: `rotate(${row.bearing}deg)` }"
                 >&#8593;</span
               >
             </dd>
@@ -170,6 +145,21 @@ dt {
 .arrow {
   display: inline-block;
   line-height: 1;
+}
+
+.bar {
+  flex: 1;
+  min-width: 2.5rem;
+  height: 0.3rem;
+  border-radius: 0.15rem;
+  background: rgb(255 255 255 / 0.15);
+  overflow: hidden;
+}
+
+.fill {
+  display: block;
+  height: 100%;
+  background: rgb(255 255 255 / 0.6);
 }
 
 dd {

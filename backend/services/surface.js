@@ -9,10 +9,12 @@ const { forecastDays, fog } = JSON.parse(
   readFileSync(new URL("../config/model.json", import.meta.url)),
 );
 
-const GRID = fog.surface.sampleGridDegrees;
+const WEATHER_GRID_DEGREES = 0.0703125;
 const SOURCES = Object.values(fog.surface.layers).map(
   (layer) => layer.source,
 );
+
+const TIMEZONE = "Atlantic/Azores";
 
 const HOURS_PER_DAY = 24;
 const EXPECTED_HOURS = forecastDays * HOURS_PER_DAY;
@@ -41,10 +43,10 @@ async function samplePoints() {
       const lon = west + ((x + 0.5) / width) * (east - west);
       const lat = north - ((y + 0.5) / height) * (north - south);
 
-      const gx = Math.floor(lon / GRID);
-      const gy = Math.floor(lat / GRID);
-      const offLon = lon - (gx + 0.5) * GRID;
-      const offLat = lat - (gy + 0.5) * GRID;
+      const gx = Math.floor(lon / WEATHER_GRID_DEGREES);
+      const gy = Math.floor(lat / WEATHER_GRID_DEGREES);
+      const offLon = lon - (gx + 0.5) * WEATHER_GRID_DEGREES;
+      const offLat = lat - (gy + 0.5) * WEATHER_GRID_DEGREES;
       const offset = offLat * offLat + offLon * offLon;
 
       const key = `${gy}:${gx}`;
@@ -72,7 +74,7 @@ async function fetchAll() {
     longitude: requests.map((p) => p.lon.toFixed(4)).join(","),
     hourly: SOURCES.join(","),
     forecast_days: String(forecastDays),
-    timezone: "auto",
+    timezone: TIMEZONE,
   });
 
   const res = await fetch(`${API}?${params}`);

@@ -33,6 +33,33 @@ function fetchDem(url) {
   return demCache.get(url);
 }
 
+function coverAt(dem, points, hour, x, y) {
+  if (!points?.length) return null;
+
+  const source = model.fog.surface.layers.cloudCover.source;
+  const [west, south, east, north] = dem.bbox;
+  const lon = west + ((x + 0.5) / dem.width) * (east - west);
+  const lat = north - ((y + 0.5) / dem.height) * (north - south);
+
+  let value = 0;
+  let weight = 0;
+
+  for (const { index, weight: share } of nearestPoints(
+    lat,
+    lon,
+    points,
+    model.sea.neighbors,
+    model.sea.idwPower,
+  )) {
+    const reading = points[index][source]?.[hour];
+    if (!Number.isFinite(reading)) continue;
+    value += reading * share;
+    weight += share;
+  }
+
+  return weight ? Math.round(value / weight) : null;
+}
+
 const azoresHour = () =>
   Number(
     new Intl.DateTimeFormat("en-GB", {
@@ -257,7 +284,7 @@ export function useForecast() {
       elevation: z,
       slope: dem.slope[index],
       aspect: dem.aspect[index] * 2,
-      cover: coverAt(model, dem, forecast.value.points, at, x, y),
+      cover: coverAt(dem, forecast.value.points, at, x, y),
       cloudBase: Math.round(cloudBase),
       cloudTop: Math.round(c.top),
       depth: Math.round(z - cloudBase),
@@ -291,15 +318,9 @@ export function useForecast() {
     const flat = gx === 0 && gy === 0;
 
     const points = forecast.value.points;
-    const { score, values, directions } = seaMath.scoreCell(
+    const { score, cell } = seaMath.scoreCell(
       points,
-      nearestPoints(
-        lat,
-        lon,
-        points,
-        model.sea.neighbors,
-        model.sea.idwPower,
-      ),
+      nearestPoints(lat, lon, points, model.sea.neighbors, model.sea.idwPower),
       dayIndex.value * HOURS_PER_DAY + hourIndex.value,
       {
         coastMeters: dem.coast[index] * model.cellSize,
@@ -311,10 +332,10 @@ export function useForecast() {
     return {
       ...base,
       offshore: false,
+      shore: Math.round(dem.coast[index] * model.cellSize),
       class: SEA_CLASS_NAMES[seaMath.classify(score)],
       score,
-      layers: values,
-      directions,
+      layers: seaMath.describe(cell),
     };
   }
 

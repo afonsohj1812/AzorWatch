@@ -8,6 +8,8 @@ const { forecastDays } = JSON.parse(
   readFileSync(new URL("../config/model.json", import.meta.url)),
 );
 
+const TIMEZONE = "Atlantic/Azores";
+
 const HOURS_PER_DAY = 24;
 const EXPECTED_HOURS = forecastDays * HOURS_PER_DAY;
 
@@ -40,7 +42,7 @@ function url() {
       ]),
     ].join(","),
     forecast_days: String(forecastDays),
-    timezone: "auto",
+    timezone: TIMEZONE,
   });
   return `${API}?${params}`;
 }

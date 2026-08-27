@@ -4,8 +4,10 @@ import { PNG } from "pngjs";
 import {
   createSeaMath,
   DIRECTION_SOURCES,
+  LAYER_LABELS,
   LAYER_SOURCES,
   SEA_CLASS_NAMES,
+  SERIES,
 } from "./seaMath.js";
 import { loadDem } from "./dem.js";
 import { dayLabel, weekday } from "./dates.js";
@@ -21,9 +23,10 @@ const PALETTE = SEA_CLASS_NAMES.map(
   (name) => config.classes[name].rgb,
 );
 
-const LAYER_NAMES = ["visibility", ...Object.keys(LAYER_SOURCES)];
-const DIRECTIONS = Object.keys(DIRECTION_SOURCES);
-const SCORED_LAYERS = Object.entries(config.sea.layers);
+const SOURCED = Object.entries(LAYER_SOURCES);
+const DIRECTIONS = Object.entries(DIRECTION_SOURCES);
+const SERIES_NAMES = SERIES.map(([name]) => name);
+const SCORED = LAYER_LABELS.filter(({ id }) => config.sea.layers[id]);
 const CELL_SIZE = config.cellSize;
 const BAND_CELLS = Math.round(config.sea.bandMeters / config.cellSize);
 const NEIGHBORS = config.sea.neighbors;
@@ -214,7 +217,7 @@ export function inspectSeaCell(dem, summary, hour, time, x, y) {
     weight: 0,
   }));
 
-  const { score, values, directions } = math.scoreCell(
+  const { score, cell } = math.scoreCell(
     summary.points,
     cellBlend(blend, j, slots),
     hour,
@@ -229,10 +232,10 @@ export function inspectSeaCell(dem, summary, hour, time, x, y) {
     shore: Math.round(blend.shore[j]),
     class: SEA_CLASS_NAMES[math.classify(score)],
     score: round(score, 3),
-    layers: Object.fromEntries(
-      Object.entries(values).map(([k, v]) => [k, round(v, 2)]),
-    ),
-    directions,
+    layers: math.describe(cell).map((entry) => ({
+      ...entry,
+      penalty: round(entry.penalty, 3),
+    })),
   };
 }
 
@@ -255,12 +258,12 @@ export async function buildSeaForecast(id, onOverlay) {
 
   const dem = await loadDem(id);
   const blend = blendFor(id, dem, points);
-  const { cells, indices, weights, k, shore, normalX, normalY } = blend;
+  const { cells, k } = blend;
 
   const hours = marine.time.length - marine.historyHours;
   const hourClass = new Uint8Array(hours);
-  const scores = new Float64Array(points.length);
   const classes = new Uint8Array(cells.length);
+  const slots = Array.from({ length: k }, () => ({ index: 0, weight: 0 }));
 
   const png = new PNG({ width: dem.width, height: dem.height });
   png.data.fill(0);
@@ -269,50 +272,45 @@ export async function buildSeaForecast(id, onOverlay) {
     await onOverlay({
       time: "band",
       etag: `"${id}:band"`,
-      png: renderBand(dem, cells, shore, blend.bearings),
+      png: renderBand(dem, cells, blend.shore, blend.bearings),
     });
 
   const summaryPoints = points.map((point) => ({
     lat: point.lat,
     lon: point.lon,
-    score: new Array(hours),
-    layers: Object.fromEntries(
-      LAYER_NAMES.map((name) => [name, new Array(hours)]),
-    ),
+    layers: Object.fromEntries(SOURCED.map(([id]) => [id, new Array(hours)])),
     directions: Object.fromEntries(
-      DIRECTIONS.map((name) => [name, new Array(hours)]),
+      DIRECTIONS.map(([id]) => [id, new Array(hours)]),
     ),
+    series: Object.fromEntries(SERIES_NAMES.map((n) => [n, new Array(hours)])),
   }));
 
-  const layerHourClass = SCORED_LAYERS.map(() => new Uint8Array(hours));
-  const slots = Array.from({ length: k }, () => ({ index: 0, weight: 0 }));
+  const layerHourClass = SCORED.map(() => new Uint8Array(hours));
 
   for (let hour = 0; hour < hours; hour++) {
     const index = marine.historyHours + hour;
 
     for (let p = 0; p < points.length; p++) {
-      scores[p] = math.score(points[p], index) ?? 1;
-      summaryPoints[p].score[hour] = round(scores[p], 3);
+      for (const [layer, source] of SOURCED)
+        summaryPoints[p].layers[layer][hour] = round(points[p][source]?.[index], 2);
 
-      const values = math.layerValues(points[p], index);
-      for (const name of LAYER_NAMES)
-        summaryPoints[p].layers[name][hour] = round(values[name], 2);
-
-      DIRECTIONS.forEach((name) => {
-        const degrees = points[p][DIRECTION_SOURCES[name]]?.[index];
-        summaryPoints[p].directions[name][hour] = Number.isFinite(degrees)
+      for (const [layer, source] of DIRECTIONS) {
+        const degrees = points[p][source]?.[index];
+        summaryPoints[p].directions[layer][hour] = Number.isFinite(degrees)
           ? Math.round(degrees)
           : null;
-      });
+      }
+
+      const series = math.seriesFor(points[p], index);
+      for (const name of SERIES_NAMES)
+        summaryPoints[p].series[name][hour] = round(series[name], 4);
     }
 
     const counts = new Int32Array(SEA_CLASS_NAMES.length);
-    const layerCounts = SCORED_LAYERS.map(() =>
-      new Int32Array(SEA_CLASS_NAMES.length),
-    );
+    const layerCounts = SCORED.map(() => new Int32Array(SEA_CLASS_NAMES.length));
 
     for (let j = 0; j < cells.length; j++) {
-      const { score, values } = math.scoreCell(
+      const { score, cell } = math.scoreCell(
         summaryPoints,
         cellBlend(blend, j, slots),
         hour,
@@ -323,20 +321,14 @@ export async function buildSeaForecast(id, onOverlay) {
       classes[j] = seaClass;
       counts[seaClass]++;
 
-      SCORED_LAYERS.forEach(([name, spec], li) => {
-        if (!Number.isFinite(values[name])) return;
-        layerCounts[li][
-          math.classify(math.normalize(values[name], spec.perfect, spec.undivable))
-        ]++;
+      SCORED.forEach(({ id: layer }, li) => {
+        layerCounts[li][math.classify(math.penaltyOf(cell, layer))]++;
       });
     }
 
     hourClass[hour] = percentileClass(counts, cells.length);
-    for (let li = 0; li < SCORED_LAYERS.length; li++)
-      layerHourClass[li][hour] = percentileClass(
-        layerCounts[li],
-        cells.length,
-      );
+    for (let li = 0; li < SCORED.length; li++)
+      layerHourClass[li][hour] = percentileClass(layerCounts[li], cells.length);
 
     if (onOverlay)
       await onOverlay({
@@ -363,8 +355,8 @@ export async function buildSeaForecast(id, onOverlay) {
       weekday: weekday(date),
       seaClass: dayClassOf(hourClass, start),
       layerClass: Object.fromEntries(
-        SCORED_LAYERS.map(([name], li) => [
-          name,
+        SCORED.map(({ id: layer }, li) => [
+          layer,
           dayClassOf(layerHourClass[li], start),
         ]),
       ),
@@ -372,8 +364,8 @@ export async function buildSeaForecast(id, onOverlay) {
         time: marine.time[marine.historyHours + start + h],
         seaClass: SEA_CLASS_NAMES[hourClass[start + h]],
         layerClass: Object.fromEntries(
-          SCORED_LAYERS.map(([name], li) => [
-            name,
+          SCORED.map(({ id: layer }, li) => [
+            layer,
             SEA_CLASS_NAMES[layerHourClass[li][start + h]],
           ]),
         ),
