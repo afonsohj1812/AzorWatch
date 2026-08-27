@@ -54,7 +54,7 @@
     "bandMeters": 1000,
 
     "layers": {
-      "wave": { "weight": 3.0, "perfect": 0.5, "undivable": 2.0 },
+      "wave": { "weight": 5.0, "perfect": 0.5, "undivable": 2.0 },
       "visibility": {
         "weight": 2.0,
         "perfect": 20,

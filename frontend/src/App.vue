@@ -6,6 +6,7 @@ import DayPicker from "./components/DayPicker.vue";
 import IslandPicker from "./components/IslandPicker.vue";
 import ModeSwitch from "./components/ModeSwitch.vue";
 import LayerPicker from "./components/LayerPicker.vue";
+import MobileMenu from "./components/MobileMenu.vue";
 import HourSlider from "./components/HourSlider.vue";
 import Legend from "./components/Legend.vue";
 import PointInfo from "./components/PointInfo.vue";
@@ -56,20 +57,42 @@ const currentHour = computed(() =>
     <div class="panel panel--top">
       <DayPicker v-model="dayIndex" :days="days" :mode="mode" />
     </div>
-    <div class="panel panel--mode">
-      <ModeSwitch v-model="mode" />
+    <div v-if="isMobile" class="panel panel--menu">
+      <MobileMenu>
+        <section class="group">
+          <h2>Mode</h2>
+          <ModeSwitch v-model="mode" />
+        </section>
+        <section class="group">
+          <h2>Layer</h2>
+          <LayerPicker v-model="layer" :entries="layerEntries" />
+        </section>
+        <section class="group">
+          <h2>Island</h2>
+          <IslandPicker
+            v-model="islandId"
+            :islands="islands"
+            @select="viewReset++"
+          />
+        </section>
+      </MobileMenu>
     </div>
-    <div class="panel panel--layers">
-      <LayerPicker v-model="layer" :entries="layerEntries" />
-    </div>
-    <div class="panel panel--left">
-      <IslandPicker
-        v-model="islandId"
-        :islands="islands"
-        :collapsible="isMobile"
-        @select="viewReset++"
-      />
-    </div>
+
+    <template v-else>
+      <div class="panel panel--mode">
+        <ModeSwitch v-model="mode" />
+      </div>
+      <div class="panel panel--layers">
+        <LayerPicker v-model="layer" :entries="layerEntries" />
+      </div>
+      <div class="panel panel--left">
+        <IslandPicker
+          v-model="islandId"
+          :islands="islands"
+          @select="viewReset++"
+        />
+      </div>
+    </template>
     <div class="panel panel--right">
       <PointInfo :point="point" :mode="mode" />
     </div>
@@ -114,6 +137,26 @@ const currentHour = computed(() =>
 .panel--mode {
   top: 1rem;
   left: 1rem;
+}
+
+.panel--menu {
+  top: 6rem;
+  left: 0.5rem;
+  z-index: 20;
+}
+
+.group {
+  display: flex;
+  flex-direction: column;
+  gap: 0.35rem;
+}
+
+.group h2 {
+  font-size: 0.7rem;
+  font-weight: bold;
+  letter-spacing: 0.05em;
+  text-transform: uppercase;
+  color: rgb(255 255 255 / 0.6);
 }
 
 .panel--layers {
@@ -174,27 +217,8 @@ const currentHour = computed(() =>
     top: 0.5rem;
   }
 
-  .panel--mode {
-    top: 6rem;
-    left: 0.5rem;
-  }
-
-  .panel--layers {
-    top: 8.75rem;
-    left: 0.5rem;
-    right: 0.5rem;
-    transform: none;
-  }
-
-  .panel--left {
-    top: auto;
-    bottom: 6rem;
-    left: 0.5rem;
-    transform: none;
-  }
-
   .panel--right {
-    top: 11.5rem;
+    top: 6rem;
     right: 0.5rem;
     transform: none;
   }
