@@ -63,7 +63,7 @@ app.get("/api/sea/:islandId", async (req, res, next) => {
 app.get("/api/fog/:islandId/:hour.png", async (req, res, next) => {
   try {
     const { islandId, hour } = req.params;
-    sendOverlay(req, res, await findOverlay("fog", islandId, hour));
+    sendOverlay(req, res, await findOverlay("fog", islandId, "overall", hour));
   } catch (err) {
     next(err);
   }
@@ -73,7 +73,17 @@ app.get("/api/fog/:islandId/:hour.png", async (req, res, next) => {
 app.get("/api/sea/:islandId/:hour.png", async (req, res, next) => {
   try {
     const { islandId, hour } = req.params;
-    sendOverlay(req, res, await findOverlay("sea", islandId, hour));
+    sendOverlay(req, res, await findOverlay("sea", islandId, "overall", hour));
+  } catch (err) {
+    next(err);
+  }
+});
+
+// Island hour image for a single dive layer, such as wave or visibility
+app.get("/api/sea/:islandId/:layer/:hour.png", async (req, res, next) => {
+  try {
+    const { islandId, layer, hour } = req.params;
+    sendOverlay(req, res, await findOverlay("sea", islandId, layer, hour));
   } catch (err) {
     next(err);
   }

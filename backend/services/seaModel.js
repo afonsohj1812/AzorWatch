@@ -99,7 +99,6 @@ function buildBlend(dem, points) {
   const shore = new Float32Array(cells.length);
   const normalX = new Float32Array(cells.length);
   const normalY = new Float32Array(cells.length);
-  const bearings = new Float32Array(cells.length);
 
   const distanceAt = (x, y) =>
     coast[
@@ -121,7 +120,6 @@ function buildBlend(dem, points) {
     const bearing = Math.atan2(gx, -gy);
     normalX[j] = Math.cos(bearing);
     normalY[j] = Math.sin(bearing);
-    bearings[j] = ((bearing * 180) / Math.PI + 360) % 360;
   }
 
   return {
@@ -132,7 +130,6 @@ function buildBlend(dem, points) {
     shore,
     normalX,
     normalY,
-    bearings,
   };
 }
 
@@ -169,20 +166,6 @@ function renderOverlay(png, cells, classes) {
     png.data[p + 1] = g;
     png.data[p + 2] = b;
     png.data[p + 3] = a;
-  }
-
-  return PNG.sync.write(png);
-}
-
-function renderBand(dem, cells, shore, bearings) {
-  const png = new PNG({ width: dem.width, height: dem.height });
-  png.data.fill(0);
-
-  for (let j = 0; j < cells.length; j++) {
-    const p = cells[j] * 4;
-    png.data[p] = Math.min(255, Math.round(shore[j] / CELL_SIZE));
-    png.data[p + 1] = Math.round(bearings[j] / 2) % 180;
-    png.data[p + 3] = 255;
   }
 
   return PNG.sync.write(png);
@@ -268,13 +251,6 @@ export async function buildSeaForecast(id, onOverlay) {
   const png = new PNG({ width: dem.width, height: dem.height });
   png.data.fill(0);
 
-  if (onOverlay)
-    await onOverlay({
-      time: "band",
-      etag: `"${id}:band"`,
-      png: renderBand(dem, cells, blend.shore, blend.bearings),
-    });
-
   const summaryPoints = points.map((point) => ({
     lat: point.lat,
     lon: point.lon,
@@ -286,6 +262,7 @@ export async function buildSeaForecast(id, onOverlay) {
   }));
 
   const layerHourClass = SCORED.map(() => new Uint8Array(hours));
+  const layerClasses = SCORED.map(() => new Uint8Array(cells.length));
 
   for (let hour = 0; hour < hours; hour++) {
     const index = marine.historyHours + hour;
@@ -322,7 +299,9 @@ export async function buildSeaForecast(id, onOverlay) {
       counts[seaClass]++;
 
       SCORED.forEach(({ id: layer }, li) => {
-        layerCounts[li][math.classify(math.penaltyOf(cell, layer))]++;
+        const layerClass = math.classify(math.penaltyOf(cell, layer));
+        layerClasses[li][j] = layerClass;
+        layerCounts[li][layerClass]++;
       });
     }
 
@@ -330,12 +309,21 @@ export async function buildSeaForecast(id, onOverlay) {
     for (let li = 0; li < SCORED.length; li++)
       layerHourClass[li][hour] = percentileClass(layerCounts[li], cells.length);
 
-    if (onOverlay)
+    if (onOverlay) {
       await onOverlay({
         time: marine.time[index],
         etag: `"${marine.runAt}:${id}:sea:${hour}"`,
         png: renderOverlay(png, cells, classes),
       });
+
+      for (let li = 0; li < SCORED.length; li++)
+        await onOverlay({
+          layer: SCORED[li].id,
+          time: marine.time[index],
+          etag: `"${marine.runAt}:${id}:sea:${SCORED[li].id}:${hour}"`,
+          png: renderOverlay(png, cells, layerClasses[li]),
+        });
+    }
   }
 
   const dayClassOf = (series, start) => {

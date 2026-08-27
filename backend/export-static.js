@@ -34,16 +34,21 @@ async function main() {
 
       let islandBytes = 0;
       let hours = 0;
+      const made = new Set();
 
       let summary;
       try {
         const built = await model.build(island.id, async (overlay) => {
-          await writeFile(
-            `${OUT}/${model.overlays}/${island.id}/${overlay.time}.png`,
-            overlay.png,
-          );
+          const into = overlay.layer ? `${dir}/${overlay.layer}` : dir;
+
+          if (!made.has(into)) {
+            await mkdir(into, { recursive: true });
+            made.add(into);
+          }
+
+          await writeFile(`${into}/${overlay.time}.png`, overlay.png);
           islandBytes += overlay.png.length;
-          hours++;
+          if (!overlay.layer) hours++;
         });
 
         const { time, ...rest } = built;

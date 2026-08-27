@@ -12,8 +12,10 @@ export const summaryUrl = (mode, id) =>
     ? url(STATIC ? `sea/${id}.json` : `sea/${id}`)
     : url(STATIC ? `forecast/${id}.json` : `forecast/${id}`);
 
-export const overlayUrl = (mode, id, time) =>
-  url(`${mode === "sea" ? "sea" : "fog"}/${id}/${time}.png`);
+export const overlayUrl = (mode, id, time, layer) =>
+  url(
+    `${mode === "sea" ? "sea" : "fog"}/${id}/${layer ? `${layer}/` : ""}${time}.png`,
+  );
 
 export const pointUrl = (mode, id, time, x, y) =>
   mode === "sea"

@@ -1,16 +1,5 @@
 import model from "./config/model.json";
-import {
-  createSeaMath,
-  LAYER_LABELS,
-  nearestPoints,
-  SEA_CLASS_NAMES,
-} from "./services/seaMath";
-
-const math = createSeaMath(model);
-
-const PALETTE = SEA_CLASS_NAMES.map(
-  (name) => model.classes[name].rgb,
-);
+import { LAYER_LABELS, nearestPoints } from "./services/seaMath";
 
 export const OVERALL = "overall";
 
@@ -69,21 +58,13 @@ async function maskFor(id, url) {
 
     const { data } = context.getImageData(0, 0, image.width, image.height);
     const pixels = [];
-    const shore = [];
-    const bearing = [];
-    for (let i = 0; i < image.width * image.height; i++) {
-      if (data[i * 4 + 3] === 0) continue;
-      pixels.push(i);
-      shore.push(data[i * 4] * model.cellSize);
-      bearing.push((data[i * 4 + 1] * 2 * Math.PI) / 180);
-    }
+    for (let i = 0; i < image.width * image.height; i++)
+      if (data[i * 4 + 3] !== 0) pixels.push(i);
 
     return {
       width: image.width,
       height: image.height,
       pixels: Int32Array.from(pixels),
-      shore: Float32Array.from(shore),
-      bearing: Float32Array.from(bearing),
     };
   });
 
@@ -145,37 +126,26 @@ function paint(mask, colorAt) {
 }
 
 export async function renderLayer({ id, bbox, points, layer, hour, maskUrl }) {
-  const surface = isSurfaceLayer(layer);
-  if (!points?.length || !(surface || model.sea.layers[layer])) return null;
+  if (!points?.length || !isSurfaceLayer(layer)) return null;
 
-  const key = surface ? `${id}:land` : id;
+  const key = `${id}:land`;
   const mask = await maskFor(key, maskUrl);
   if (!mask.pixels.length) return null;
 
   const blend = blendFor(key, mask, bbox, points);
-
-  if (surface) {
-    const spec = SURFACE_LAYERS[layer];
-    return paint(mask, (j) => {
-      let value = 0;
-      let weight = 0;
-      for (const { index, weight: share } of blend[j]) {
-        const reading = points[index][spec.source]?.[hour];
-        if (!Number.isFinite(reading)) continue;
-        value += reading * share;
-        weight += share;
-      }
-      return weight ? RAMP[rampBin(value / weight, spec)] : null;
-    });
-  }
+  const spec = SURFACE_LAYERS[layer];
 
   return paint(mask, (j) => {
-    const cell = math.cellFor(points, blend[j], hour, {
-      coastMeters: mask.shore[j],
-      normalX: Math.cos(mask.bearing[j]),
-      normalY: Math.sin(mask.bearing[j]),
-    });
+    let value = 0;
+    let weight = 0;
 
-    return PALETTE[math.classify(math.penaltyOf(cell, layer))];
+    for (const { index, weight: share } of blend[j]) {
+      const reading = points[index][spec.source]?.[hour];
+      if (!Number.isFinite(reading)) continue;
+      value += reading * share;
+      weight += share;
+    }
+
+    return weight ? RAMP[rampBin(value / weight, spec)] : null;
   });
 }

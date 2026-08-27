@@ -165,24 +165,23 @@ export function useForecast() {
   const hours = computed(() => day.value?.hours ?? []);
   const hour = computed(() => hours.value[hourIndex.value] ?? null);
 
-  const overlayFor = (time) => overlayUrl(mode.value, islandId.value, time);
+  const overlayFor = (time, forLayer) =>
+    overlayUrl(mode.value, islandId.value, time, forLayer);
+
+  const seaLayer = computed(
+    () => mode.value === "sea" && layer.value !== OVERALL,
+  );
+
+  const renderedLayer = computed(() => isSurfaceLayer(layer.value));
 
   const hourlyOverlay = computed(() =>
-    hour.value ? overlayFor(hour.value.time) : null,
+    hour.value
+      ? overlayFor(hour.value.time, seaLayer.value ? layer.value : null)
+      : null,
   );
-
-  const currentOverlay = hourlyOverlay;
 
   const layerOverlay = ref(null);
-  const showingLayer = computed(
-    () =>
-      (mode.value === "sea" && layer.value !== OVERALL) ||
-      isSurfaceLayer(layer.value),
-  );
-
-  const maskUrl = computed(() =>
-    isSurfaceLayer(layer.value) ? overlayFor("land") : overlayFor("band"),
-  );
+  const maskUrl = computed(() => overlayFor("land"));
 
   let layerToken = 0;
 
@@ -192,11 +191,11 @@ export function useForecast() {
   }
 
   watch(
-    [showingLayer, layer, islandId, hourIndex, dayIndex, forecast],
+    [renderedLayer, layer, islandId, hourIndex, dayIndex, forecast],
     async () => {
       const token = ++layerToken;
 
-      if (!showingLayer.value || !island.value || !hour.value || !ready.value)
+      if (!renderedLayer.value || !island.value || !hour.value || !ready.value)
         return releaseLayer();
 
       const url = await renderLayer({
@@ -222,16 +221,18 @@ export function useForecast() {
   onScopeDispose(releaseLayer);
 
   const displayedOverlay = computed(() =>
-    showingLayer.value ? layerOverlay.value : currentOverlay.value,
+    renderedLayer.value ? layerOverlay.value : hourlyOverlay.value,
   );
 
-  const prefetchUrls = computed(() =>
-    showingLayer.value
-      ? []
-      : [hourIndex.value - 1, hourIndex.value + 1]
-          .filter((i) => i >= 0 && i < hours.value.length)
-          .map((i) => overlayFor(hours.value[i].time)),
-  );
+  const prefetchUrls = computed(() => {
+    if (renderedLayer.value) return [];
+
+    const forLayer = seaLayer.value ? layer.value : null;
+
+    return [hourIndex.value - 1, hourIndex.value + 1]
+      .filter((i) => i >= 0 && i < hours.value.length)
+      .map((i) => overlayFor(hours.value[i].time, forLayer));
+  });
 
   const updatedLabel = computed(() => {
     if (!forecast.value?.storedAt) return null;

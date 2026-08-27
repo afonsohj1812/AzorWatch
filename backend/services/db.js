@@ -37,10 +37,10 @@ export async function findForecast(kind, island) {
   );
 }
 
-export async function findOverlay(kind, island, time) {
+export async function findOverlay(kind, island, layer, time) {
   const { overlays } = await collections();
   return overlays.findOne(
-    { _id: `${kind}:${island}:${time}` },
+    { _id: `${kind}:${island}:${layer}:${time}` },
     { projection: { _id: 0, etag: 1, png: 1 } },
   );
 }
@@ -58,10 +58,10 @@ export async function saveOverlays(kind, island, runAt, items) {
   const { overlays } = await collections();
 
   await overlays.bulkWrite(
-    items.map(({ time, etag, png }) => ({
+    items.map(({ layer = "overall", time, etag, png }) => ({
       replaceOne: {
-        filter: { _id: `${kind}:${island}:${time}` },
-        replacement: { kind, island, time, runAt, etag, png },
+        filter: { _id: `${kind}:${island}:${layer}:${time}` },
+        replacement: { kind, island, layer, time, runAt, etag, png },
         upsert: true,
       },
     })),
