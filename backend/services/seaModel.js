@@ -19,9 +19,7 @@ const config = JSON.parse(
 
 const math = createSeaMath(config);
 
-const PALETTE = SEA_CLASS_NAMES.map(
-  (name) => config.classes[name].rgb,
-);
+const PALETTE = SEA_CLASS_NAMES.map((name) => config.classes[name].rgb);
 
 const SOURCED = Object.entries(LAYER_SOURCES);
 const DIRECTIONS = Object.entries(DIRECTION_SOURCES);
@@ -269,7 +267,10 @@ export async function buildSeaForecast(id, onOverlay) {
 
     for (let p = 0; p < points.length; p++) {
       for (const [layer, source] of SOURCED)
-        summaryPoints[p].layers[layer][hour] = round(points[p][source]?.[index], 2);
+        summaryPoints[p].layers[layer][hour] = round(
+          points[p][source]?.[index],
+          2,
+        );
 
       for (const [layer, source] of DIRECTIONS) {
         const degrees = points[p][source]?.[index];
@@ -284,7 +285,9 @@ export async function buildSeaForecast(id, onOverlay) {
     }
 
     const counts = new Int32Array(SEA_CLASS_NAMES.length);
-    const layerCounts = SCORED.map(() => new Int32Array(SEA_CLASS_NAMES.length));
+    const layerCounts = SCORED.map(
+      () => new Int32Array(SEA_CLASS_NAMES.length),
+    );
 
     for (let j = 0; j < cells.length; j++) {
       const { score, cell } = math.scoreCell(
@@ -329,7 +332,7 @@ export async function buildSeaForecast(id, onOverlay) {
   const dayClassOf = (series, start) => {
     const slice = Array.from(series.slice(start, start + HOURS_PER_DAY));
     slice.sort((a, b) => a - b);
-    return SEA_CLASS_NAMES[slice[Math.floor(PERCENTILE * (slice.length - 1))]];
+    return SEA_CLASS_NAMES[slice[Math.round(PERCENTILE * (slice.length - 1))]];
   };
 
   const days = [];

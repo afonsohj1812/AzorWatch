@@ -107,7 +107,7 @@ const open = ref(false);
 .sheet :deep(.layer-picker),
 .sheet :deep(.island-picker) {
   display: grid;
-  grid-template-columns: repeat(2, 1fr);
+  grid-template-columns: repeat(3, 1fr);
   gap: 0.35rem;
   max-width: none;
   overflow-x: visible;

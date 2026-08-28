@@ -14,9 +14,7 @@ const config = JSON.parse(
 
 const math = createFogMath(config);
 
-const PALETTE = FOG_CLASS_NAMES.map(
-  (name) => config.classes[name].rgb,
-);
+const PALETTE = FOG_CLASS_NAMES.map((name) => config.classes[name].rgb);
 
 const {
   hourConditions,
@@ -134,7 +132,6 @@ export async function buildForecast(id, onOverlay) {
         etag: `"${runAt}:${id}:${hour}"`,
         png: renderOverlay(classes, dem.width, dem.height),
       });
-
   }
 
   const days = [];
@@ -149,7 +146,7 @@ export async function buildForecast(id, onOverlay) {
       date,
       label: dayLabel(date),
       weekday: weekday(date),
-      fogClass: FOG_CLASS_NAMES[Math.floor(total / HOURS_PER_DAY)],
+      fogClass: FOG_CLASS_NAMES[Math.round(total / HOURS_PER_DAY)],
       hours: Array.from({ length: HOURS_PER_DAY }, (_, h) => ({
         time: forecast.time[start + h],
         fogClass: FOG_CLASS_NAMES[hourClass[start + h]],
@@ -203,4 +200,3 @@ export function inspectCell(dem, doc, hour, time, x, y) {
     cover: coverAt(dem, doc.points, hour, x, y),
   };
 }
-

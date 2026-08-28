@@ -75,7 +75,7 @@
     "exposure": { "wave": 0.5, "wind": 0.5 },
 
     "classThresholds": { "green": 0.25, "yellow": 0.5, "orange": 0.75 },
-    "summary": { "percentile": 0.25 },
+    "summary": { "percentile": 0.5 },
     "neighbors": 3,
     "idwPower": 3,
 
