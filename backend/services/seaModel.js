@@ -258,6 +258,7 @@ export function inspectSeaCell(dem, summary, hour, time, x, y) {
     layers: math.describe(cell).map((entry) => ({
       ...entry,
       penalty: round(entry.penalty, 3),
+      value: round(entry.value, 3),
     })),
   };
 }

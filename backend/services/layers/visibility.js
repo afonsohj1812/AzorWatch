@@ -35,8 +35,8 @@ export default {
     return clearAt(turbidity * (1 + nearness * config.shoreWeight), config);
   },
 
-  penalty(cell, config) {
-    return ramp(this.meters(cell, config), config.perfect, config.undivable);
+  value(cell, config) {
+    return this.meters(cell, config);
   },
 
   readout(cell, config) {

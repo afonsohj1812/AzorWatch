@@ -1,5 +1,3 @@
-import { ramp } from "../curve.js";
-
 function rateAt(values, index) {
   const before = values?.[index - 1];
   const here = values?.[index];
@@ -22,12 +20,8 @@ export default {
     tideRate: (point, index) => rateAt(point.sea_level_height_msl, index),
   },
 
-  penalty: (cell, config) =>
-    ramp(
-      cell.tideRate >= 0 ? cell.tideRate : -cell.tideRate * config.falling,
-      config.perfect,
-      config.undivable,
-    ),
+  value: (cell, config) =>
+    cell.tideRate >= 0 ? cell.tideRate : -cell.tideRate * config.falling,
 
   readout: (cell) => {
     const rate = cell.tideRate ?? 0;

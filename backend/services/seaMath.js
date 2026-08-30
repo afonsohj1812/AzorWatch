@@ -130,30 +130,73 @@ export function createSeaMath(config) {
     return cell;
   }
 
+  const LEVELS = [
+    0,
+    classThresholds.green,
+    classThresholds.yellow,
+    classThresholds.orange,
+    1,
+  ];
+
+  function grade(value, config) {
+    if (!Number.isFinite(value)) return 1;
+
+    const anchors = [config.perfect, ...config.ranges, config.undivable];
+
+    for (let i = 0; i < anchors.length - 1; i++) {
+      const from = anchors[i];
+      const to = anchors[i + 1];
+      const inside =
+        from <= to ? value >= from && value <= to : value <= from && value >= to;
+      if (!inside) continue;
+
+      const share = to === from ? 0 : (value - from) / (to - from);
+      return LEVELS[i] + share * (LEVELS[i + 1] - LEVELS[i]);
+    }
+
+    const worseUpward = config.undivable > config.perfect;
+    const better = worseUpward
+      ? value < config.perfect
+      : value > config.perfect;
+
+    return better ? 0 : 1;
+  }
+
+  const valueOf = (layer, cell) => layer.value(cell, layers[layer.id]);
+  const penaltyFor = (layer, cell) => grade(valueOf(layer, cell), layers[layer.id]);
+
   function scoreCell(points, weights, hour, place) {
     const cell = cellFor(points, weights, hour, place);
 
     let sum = 0;
     for (const layer of active)
-      sum += layer.penalty(cell, layers[layer.id]) * layers[layer.id].weight;
+      sum += penaltyFor(layer, cell) * layers[layer.id].weight;
 
     return { score: sum / SCALE, cell };
   }
 
   function describe(cell) {
-    return active.map((layer) => ({
-      id: layer.id,
-      label: layer.label,
-      penalty: layer.penalty(cell, layers[layer.id]),
-      weight: layers[layer.id].weight / SCALE,
-      readout: layer.readout?.(cell, layers[layer.id]) ?? null,
-      bearing: cell[`${layer.id}Bearing`] ?? null,
-    }));
+    return active.map((layer) => {
+      const config = layers[layer.id];
+
+      return {
+        id: layer.id,
+        label: layer.label,
+        penalty: penaltyFor(layer, cell),
+        weight: config.weight / SCALE,
+        readout: layer.readout?.(cell, config) ?? null,
+        bearing: cell[`${layer.id}Bearing`] ?? null,
+        value: valueOf(layer, cell),
+        from: config.perfect,
+        to: config.undivable,
+        ranges: config.ranges,
+      };
+    });
   }
 
   function penaltyOf(cell, id) {
     const layer = active.find((entry) => entry.id === id);
-    return layer ? layer.penalty(cell, layers[id]) : null;
+    return layer ? penaltyFor(layer, cell) : null;
   }
 
   function classify(value) {
