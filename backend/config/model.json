@@ -69,7 +69,7 @@
         "light": { "weight": 0.3, "from": 400, "to": 20 }
       },
       "wind": { "weight": 2.5, "perfect": 0, "undivable": 60 },
-      "tide": { "weight": 2.0, "perfect": 0.25, "undivable": 0 }
+      "tide": { "weight": 2.0, "perfect": 0.25, "undivable": 0, "falling": 0.5 }
     },
 
     "exposure": { "wave": 0.5, "wind": 0.5 },
@@ -78,6 +78,7 @@
     "summary": { "percentile": 0.5 },
     "neighbors": 3,
     "idwPower": 3,
+    "normalRadius": 8,
 
     "classes": [
       { "id": "red", "label": "Undivable" },

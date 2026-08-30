@@ -29,10 +29,50 @@ const CELL_SIZE = config.cellSize;
 const BAND_CELLS = Math.round(config.sea.bandMeters / config.cellSize);
 const NEIGHBORS = config.sea.neighbors;
 const IDW_EXPONENT = -config.sea.idwPower / 2;
+const NORMAL_RADIUS = config.sea.normalRadius ?? 0;
 const PERCENTILE = config.sea.summary.percentile;
 const HOURS_PER_DAY = 24;
 
 const blends = new Map();
+
+function blurredCoast(coast, width, height) {
+  const source = Float32Array.from(coast);
+  if (NORMAL_RADIUS < 1) return source;
+
+  const wide = new Float32Array(coast.length);
+  const out = new Float32Array(coast.length);
+
+  for (let y = 0; y < height; y++) {
+    const row = y * width;
+    for (let x = 0; x < width; x++) {
+      let sum = 0;
+      let n = 0;
+      for (let d = -NORMAL_RADIUS; d <= NORMAL_RADIUS; d++) {
+        const xx = x + d;
+        if (xx < 0 || xx >= width) continue;
+        sum += source[row + xx];
+        n++;
+      }
+      wide[row + x] = sum / n;
+    }
+  }
+
+  for (let x = 0; x < width; x++) {
+    for (let y = 0; y < height; y++) {
+      let sum = 0;
+      let n = 0;
+      for (let d = -NORMAL_RADIUS; d <= NORMAL_RADIUS; d++) {
+        const yy = y + d;
+        if (yy < 0 || yy >= height) continue;
+        sum += wide[yy * width + x];
+        n++;
+      }
+      out[y * width + x] = sum / n;
+    }
+  }
+
+  return out;
+}
 
 function buildBlend(dem, points) {
   const { width, height, elevation, coast, ocean, bbox } = dem;
@@ -98,8 +138,9 @@ function buildBlend(dem, points) {
   const normalX = new Float32Array(cells.length);
   const normalY = new Float32Array(cells.length);
 
+  const smoothed = blurredCoast(coast, width, height);
   const distanceAt = (x, y) =>
-    coast[
+    smoothed[
       Math.min(height - 1, Math.max(0, y)) * width +
         Math.min(width - 1, Math.max(0, x))
     ];
@@ -116,8 +157,9 @@ function buildBlend(dem, points) {
     if (gx === 0 && gy === 0) continue;
 
     const bearing = Math.atan2(gx, -gy);
-    normalX[j] = Math.cos(bearing);
-    normalY[j] = Math.sin(bearing);
+    const facing = Math.min(1, Math.hypot(gx, gy));
+    normalX[j] = Math.cos(bearing) * facing;
+    normalY[j] = Math.sin(bearing) * facing;
   }
 
   return {

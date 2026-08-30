@@ -6,11 +6,9 @@ function rateAt(values, index) {
   const after = values?.[index + 1];
 
   if (Number.isFinite(before) && Number.isFinite(after))
-    return Math.abs(after - before) / 2;
-  if (Number.isFinite(before) && Number.isFinite(here))
-    return Math.abs(here - before);
-  if (Number.isFinite(here) && Number.isFinite(after))
-    return Math.abs(after - here);
+    return (after - before) / 2;
+  if (Number.isFinite(before) && Number.isFinite(here)) return here - before;
+  if (Number.isFinite(here) && Number.isFinite(after)) return after - here;
 
   return null;
 }
@@ -25,7 +23,14 @@ export default {
   },
 
   penalty: (cell, config) =>
-    ramp(cell.tideRate, config.perfect, config.undivable),
+    ramp(
+      cell.tideRate >= 0 ? cell.tideRate : -cell.tideRate * config.falling,
+      config.perfect,
+      config.undivable,
+    ),
 
-  readout: (cell) => `${(cell.tideRate ?? 0).toFixed(2)}m/h`,
+  readout: (cell) => {
+    const rate = cell.tideRate ?? 0;
+    return `${rate < 0 ? "-" : "+"}${Math.abs(rate).toFixed(2)}m/h`;
+  },
 };
