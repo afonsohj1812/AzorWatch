@@ -1,22 +1,16 @@
 import { islands } from "../config/islands.js";
+import { modes } from "../config/modes.js";
 import { saveForecast, saveOverlays } from "./db.js";
-import { buildForecast } from "./fogModel.js";
-import { buildSeaForecast } from "./seaModel.js";
-
-const MODELS = [
-  ["fog", buildForecast],
-  ["sea", buildSeaForecast],
-];
 
 let running = false;
 
-async function store(kind, build, id, storedAt) {
+async function store(mode, id, storedAt) {
   const items = [];
-  const summary = await build(id, (overlay) => items.push(overlay));
+  const summary = await mode.build(id, (overlay) => items.push(overlay));
   if (!summary) return;
 
-  await saveForecast(kind, id, { ...summary, storedAt });
-  await saveOverlays(kind, id, summary.runAt, items);
+  await saveForecast(mode.id, id, { ...summary, storedAt });
+  await saveOverlays(mode.id, id, summary.runAt, items);
 }
 
 export async function runPipeline() {
@@ -30,15 +24,15 @@ export async function runPipeline() {
 
   try {
     for (const island of islands) {
-      for (const [kind, build] of MODELS) {
-        if (failed.has(kind)) continue;
+      for (const mode of modes) {
+        if (failed.has(mode.id)) continue;
 
         try {
-          await store(kind, build, island.id, storedAt);
+          await store(mode, island.id, storedAt);
         } catch (err) {
-          failed.add(kind);
+          failed.add(mode.id);
           console.error(
-            `Pipeline: ${kind} failed (${err.message}), skipping it for the rest of this run`,
+            `Pipeline: ${mode.id} failed (${err.message}), skipping it for the rest of this run`,
           );
         }
       }

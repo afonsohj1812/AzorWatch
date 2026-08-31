@@ -1,4 +1,5 @@
-import { degreesToVector } from "./curve.js";
+import { degreesToVector } from "../../curve.js";
+import { nearestPoints } from "../../blend.js";
 import { LAYERS } from "./layers/index.js";
 
 export const SEA_CLASS_NAMES = ["green", "yellow", "orange", "red"];
@@ -36,33 +37,6 @@ export function anchorsOf(ranges) {
     ...ranges,
     last + (last - ranges[ranges.length - 2]),
   ];
-}
-
-export function nearestPoints(lat, lon, points, count, power) {
-  const scale = Math.cos((lat * Math.PI) / 180);
-
-  const ranked = points
-    .map((point, index) => {
-      const dx = (point.lon - lon) * scale;
-      const dy = point.lat - lat;
-      return { index, distance: dx * dx + dy * dy };
-    })
-    .sort((a, b) => a.distance - b.distance)
-    .slice(0, Math.min(count, points.length));
-
-  if (ranked[0].distance === 0) return [{ index: ranked[0].index, weight: 1 }];
-
-  let total = 0;
-  const weighted = ranked.map(({ index, distance }) => {
-    const weight = Math.pow(distance, -power / 2);
-    total += weight;
-    return { index, weight };
-  });
-
-  return weighted.map(({ index, weight }) => ({
-    index,
-    weight: weight / total,
-  }));
 }
 
 export function createSeaMath(config) {
@@ -218,5 +192,70 @@ export function createSeaMath(config) {
     return 3;
   }
 
-  return { seriesFor, cellFor, scoreCell, describe, penaltyOf, classify };
+  const bandCells = Math.round(config.sea.bandMeters / config.cellSize);
+
+  function inspect(dem, summary, hour, time, x, y) {
+    if (x < 0 || y < 0 || x >= dem.width || y >= dem.height) return null;
+
+    const index = y * dem.width + x;
+    const base = { time, x, y };
+
+    if (
+      dem.elevation[index] !== dem.ocean ||
+      dem.coast[index] < 1 ||
+      dem.coast[index] > bandCells
+    )
+      return {
+        ...base,
+        outside: true,
+        headline: "Outside the band",
+        note: `Conditions are modeled within ${config.sea.bandMeters / 1000}km of the coast`,
+      };
+
+    const [west, south, east, north] = dem.bbox;
+    const lon = west + ((x + 0.5) / dem.width) * (east - west);
+    const lat = north - ((y + 0.5) / dem.height) * (north - south);
+
+    const gx = (dem.coast[index + 1] - dem.coast[index - 1]) / 2;
+    const gy = (dem.coast[index + dem.width] - dem.coast[index - dem.width]) / 2;
+    const bearing = Math.atan2(gx, -gy);
+    const facing = Math.min(1, Math.hypot(gx, gy));
+
+    const { score, cell } = scoreCell(
+      summary.points,
+      nearestPoints(
+        lat,
+        lon,
+        summary.points,
+        config.sea.neighbors,
+        config.sea.idwPower,
+      ),
+      hour,
+      {
+        coastMeters: dem.coast[index] * config.cellSize,
+        normalX: Math.cos(bearing) * facing,
+        normalY: Math.sin(bearing) * facing,
+      },
+    );
+
+    return {
+      ...base,
+      outside: false,
+      headline: null,
+      note: null,
+      class: SEA_CLASS_NAMES[classify(score)],
+      score,
+      layers: describe(cell),
+    };
+  }
+
+  return {
+    seriesFor,
+    cellFor,
+    scoreCell,
+    describe,
+    penaltyOf,
+    classify,
+    inspect,
+  };
 }

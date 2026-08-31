@@ -8,10 +8,10 @@ import {
   pointUrl,
   demUrl,
 } from "../api";
-import { createFogMath, FOG_CLASS_NAMES, OCEAN } from "../services/fogMath";
+import { createFogMath } from "../services/modes/fog/math";
 import { parseDem } from "../services/demFormat";
-import { createSeaMath, nearestPoints, SEA_CLASS_NAMES } from "../services/seaMath";
-import { OVERALL, isSurfaceLayer, renderLayer } from "../layers";
+import { createSeaMath } from "../services/modes/sea/math";
+import { OVERALL } from "../layers";
 import model from "../config/model.json";
 
 const DEFAULT_ISLAND = "terceira";
@@ -31,33 +31,6 @@ function fetchDem(url) {
     );
 
   return demCache.get(url);
-}
-
-function coverAt(dem, points, hour, x, y) {
-  if (!points?.length) return null;
-
-  const source = model.fog.surface.layers.cloudCover.source;
-  const [west, south, east, north] = dem.bbox;
-  const lon = west + ((x + 0.5) / dem.width) * (east - west);
-  const lat = north - ((y + 0.5) / dem.height) * (north - south);
-
-  let value = 0;
-  let weight = 0;
-
-  for (const { index, weight: share } of nearestPoints(
-    lat,
-    lon,
-    points,
-    model.sea.neighbors,
-    model.sea.idwPower,
-  )) {
-    const reading = points[index][source]?.[hour];
-    if (!Number.isFinite(reading)) continue;
-    value += reading * share;
-    weight += share;
-  }
-
-  return weight ? Math.round(value / weight) : null;
 }
 
 const azoresHour = () =>
@@ -135,10 +108,6 @@ export function useForecast() {
     refreshTimer = setTimeout(refreshForecast, PIPELINE_LAG_MS);
   });
 
-  const classKey = computed(() =>
-    mode.value === "sea" ? "seaClass" : "fogClass",
-  );
-
   const island = computed(
     () => islands.value.find((i) => i.id === islandId.value) ?? null,
   );
@@ -146,9 +115,8 @@ export function useForecast() {
   const ready = computed(() => loadedMode.value === mode.value);
 
   const classOf = (entry) =>
-    mode.value === "sea" && layer.value !== OVERALL
-      ? entry.layerClass?.[layer.value]
-      : entry[classKey.value];
+    (layer.value === OVERALL ? null : entry.layerClass?.[layer.value]) ??
+    entry.class;
 
   const days = computed(() =>
     (ready.value ? (forecast.value?.days ?? []) : []).map((day) => ({
@@ -168,71 +136,19 @@ export function useForecast() {
   const overlayFor = (time, forLayer) =>
     overlayUrl(mode.value, islandId.value, time, forLayer);
 
-  const seaLayer = computed(
-    () => mode.value === "sea" && layer.value !== OVERALL,
+  const activeLayer = computed(() =>
+    layer.value === OVERALL ? null : layer.value,
   );
-
-  const renderedLayer = computed(() => isSurfaceLayer(layer.value));
-
-  const hourlyOverlay = computed(() =>
-    hour.value
-      ? overlayFor(hour.value.time, seaLayer.value ? layer.value : null)
-      : null,
-  );
-
-  const layerOverlay = ref(null);
-  const maskUrl = computed(() => overlayFor("land"));
-
-  let layerToken = 0;
-
-  function releaseLayer() {
-    if (layerOverlay.value) URL.revokeObjectURL(layerOverlay.value);
-    layerOverlay.value = null;
-  }
-
-  watch(
-    [renderedLayer, layer, islandId, hourIndex, dayIndex, forecast],
-    async () => {
-      const token = ++layerToken;
-
-      if (!renderedLayer.value || !island.value || !hour.value || !ready.value)
-        return releaseLayer();
-
-      const url = await renderLayer({
-        id: islandId.value,
-        bbox: island.value.bbox,
-        points: forecast.value.points,
-        layer: layer.value,
-        hour: dayIndex.value * HOURS_PER_DAY + hourIndex.value,
-        maskUrl: maskUrl.value,
-      }).catch(() => null);
-
-      if (token !== layerToken) {
-        if (url) URL.revokeObjectURL(url);
-        return;
-      }
-
-      releaseLayer();
-      layerOverlay.value = url;
-    },
-    { immediate: true },
-  );
-
-  onScopeDispose(releaseLayer);
 
   const displayedOverlay = computed(() =>
-    renderedLayer.value ? layerOverlay.value : hourlyOverlay.value,
+    hour.value ? overlayFor(hour.value.time, activeLayer.value) : null,
   );
 
-  const prefetchUrls = computed(() => {
-    if (renderedLayer.value) return [];
-
-    const forLayer = seaLayer.value ? layer.value : null;
-
-    return [hourIndex.value - 1, hourIndex.value + 1]
+  const prefetchUrls = computed(() =>
+    [hourIndex.value - 1, hourIndex.value + 1]
       .filter((i) => i >= 0 && i < hours.value.length)
-      .map((i) => overlayFor(hours.value[i].time, forLayer));
-  });
+      .map((i) => overlayFor(hours.value[i].time, activeLayer.value)),
+  );
 
   const updatedLabel = computed(() => {
     if (!forecast.value?.storedAt) return null;
@@ -261,83 +177,17 @@ export function useForecast() {
   let fogMath = null;
   let seaMath = null;
 
-  async function inspectFogLocally(x, y) {
-    fogMath ??= createFogMath(model);
-
+  async function inspectLocally(x, y) {
     const dem = await fetchDem(demUrl(islandId.value));
-    const index = y * dem.width + x;
-    const z = dem.elevation[index];
-
-    const base = { time: hour.value.time, x, y };
-    if (z === OCEAN) return { ...base, sea: true, class: "none" };
-
     const at = dayIndex.value * HOURS_PER_DAY + hourIndex.value;
-    const c = forecast.value.conditions[at];
 
-    const cloudBase = fogMath.localBase(dem.aspect[index], dem.slope[index], c);
-    const fogClass = fogMath.classifyCell(z, cloudBase, c);
+    if (mode.value === "sea") {
+      seaMath ??= createSeaMath(model);
+      return seaMath.inspect(dem, forecast.value, at, hour.value.time, x, y);
+    }
 
-    return {
-      ...base,
-      sea: false,
-      class: FOG_CLASS_NAMES[fogClass],
-      cloudy: fogMath.hasCloud(c),
-      elevation: z,
-      slope: dem.slope[index],
-      aspect: dem.aspect[index] * 2,
-      cover: coverAt(dem, forecast.value.points, at, x, y),
-      cloudBase: Math.round(cloudBase),
-      cloudTop: Math.round(c.top),
-      depth: Math.round(z - cloudBase),
-      aboveCloud: z > c.top,
-      visibility: fogMath.visibilityAt(z, cloudBase, fogClass, c),
-    };
-  }
-
-  async function inspectSeaLocally(x, y) {
-    seaMath ??= createSeaMath(model);
-
-    const dem = await fetchDem(demUrl(islandId.value));
-    const index = y * dem.width + x;
-    const band = Math.round(model.sea.bandMeters / model.cellSize);
-
-    const base = { time: hour.value.time, x, y };
-    if (
-      dem.elevation[index] !== OCEAN ||
-      dem.coast[index] < 1 ||
-      dem.coast[index] > band
-    )
-      return { ...base, offshore: true };
-
-    const [west, south, east, north] = dem.bbox;
-    const lon = west + ((x + 0.5) / dem.width) * (east - west);
-    const lat = north - ((y + 0.5) / dem.height) * (north - south);
-
-    const gx = (dem.coast[index + 1] - dem.coast[index - 1]) / 2;
-    const gy = (dem.coast[index + dem.width] - dem.coast[index - dem.width]) / 2;
-    const bearing = Math.atan2(gx, -gy);
-    const flat = gx === 0 && gy === 0;
-
-    const points = forecast.value.points;
-    const { score, cell } = seaMath.scoreCell(
-      points,
-      nearestPoints(lat, lon, points, model.sea.neighbors, model.sea.idwPower),
-      dayIndex.value * HOURS_PER_DAY + hourIndex.value,
-      {
-        coastMeters: dem.coast[index] * model.cellSize,
-        normalX: flat ? 0 : Math.cos(bearing),
-        normalY: flat ? 0 : Math.sin(bearing),
-      },
-    );
-
-    return {
-      ...base,
-      offshore: false,
-      shore: Math.round(dem.coast[index] * model.cellSize),
-      class: SEA_CLASS_NAMES[seaMath.classify(score)],
-      score,
-      layers: seaMath.describe(cell),
-    };
+    fogMath ??= createFogMath(model);
+    return fogMath.inspect(dem, forecast.value, at, hour.value.time, x, y);
   }
 
   function inspect(target) {
@@ -354,10 +204,7 @@ export function useForecast() {
       lastCall = Date.now();
 
       if (isStatic) {
-        const local =
-          mode.value === "sea" ? inspectSeaLocally : inspectFogLocally;
-
-        local(target.x, target.y)
+        inspectLocally(target.x, target.y)
           .then((data) => {
             point.value = data;
           })

@@ -1,30 +1,25 @@
 import model from "./config/model.json";
-import { LAYER_LABELS } from "./services/seaMath";
+import { LAYER_LABELS } from "./services/modes/sea/math";
 
 const SEA_RAMP = ["green", "yellow", "orange", "red"];
 
 const trim = (value) => Number(value.toFixed(2)).toString();
 
-export const MODES = [
-  { id: "sea", label: "Dive" },
-  { id: "fog", label: "Fog" },
-];
+export const MODES = model.modes;
 
 const resolve = (classes) =>
   classes.map((entry) => ({ ...entry, color: model.classes[entry.id].color }));
 
-const PALETTES = {
-  fog: resolve(model.fog.classes),
-  sea: resolve(model.sea.classes),
-};
+const PALETTES = Object.fromEntries(
+  MODES.map((mode) => [mode.id, resolve(model[mode.id].classes)]),
+);
 
-export const paletteFor = (mode) => PALETTES[mode] ?? PALETTES.fog;
+export const paletteFor = (mode) => PALETTES[mode] ?? PALETTES[MODES[0].id];
 
 export const colorOf = (mode, id) =>
   paletteFor(mode).find((entry) => entry.id === id)?.color;
 
-function rampLegend(spec) {
-  const ramp = model.fog.surface.ramp;
+function rampLegend(spec, ramp) {
   const step = (spec.max - spec.min) / ramp.length;
 
   return {
@@ -68,14 +63,13 @@ function rangeLegend(id, spec) {
 }
 
 export function legendFor(mode, layer) {
-  const surface = model.fog.surface.layers[layer];
-  if (surface) return rampLegend(surface);
+  const spec = model[mode]?.layers?.[layer];
 
-  const sea = mode === "sea" ? model.sea.layers[layer] : null;
-  if (sea) return rangeLegend(layer, sea);
+  if (spec?.ranges) return rangeLegend(layer, spec);
+  if (spec) return rampLegend(spec, model[mode].ramp);
 
   return {
-    title: mode === "sea" ? "CONDITIONS" : "VISIBILITY",
+    title: MODES.find((entry) => entry.id === mode)?.legendTitle ?? "",
     entries: paletteFor(mode),
   };
 }

@@ -1,16 +1,10 @@
 import { mkdir, writeFile, copyFile, readdir, rm } from "node:fs/promises";
 
 import { islands } from "./config/islands.js";
-import { buildForecast } from "./services/fogModel.js";
-import { buildSeaForecast } from "./services/seaModel.js";
+import { modes } from "./config/modes.js";
 
 const OUT = "dist-api";
 const DEM_DIR = "data/dem";
-
-const MODELS = [
-  { kind: "fog", build: buildForecast, summaries: "forecast", overlays: "fog" },
-  { kind: "sea", build: buildSeaForecast, summaries: "sea", overlays: "sea" },
-];
 
 async function main() {
   await mkdir(`${OUT}/dem`, { recursive: true });
@@ -21,14 +15,14 @@ async function main() {
   const storedAt = new Date().toISOString();
   const failed = new Set();
 
-  for (const model of MODELS) {
-    await mkdir(`${OUT}/${model.summaries}`, { recursive: true });
+  for (const mode of modes) {
+    await mkdir(`${OUT}/${mode.id}`, { recursive: true });
 
     let bytes = 0;
-    console.log(`\n${model.kind}:`);
+    console.log(`\n${mode.id}:`);
 
     for (const island of islands) {
-      const dir = `${OUT}/${model.overlays}/${island.id}`;
+      const dir = `${OUT}/${mode.id}/${island.id}`;
       await rm(dir, { recursive: true, force: true });
       await mkdir(dir, { recursive: true });
 
@@ -38,7 +32,7 @@ async function main() {
 
       let summary;
       try {
-        const built = await model.build(island.id, async (overlay) => {
+        const built = await mode.build(island.id, async (overlay) => {
           const into = overlay.layer ? `${dir}/${overlay.layer}` : dir;
 
           if (!made.has(into)) {
@@ -54,13 +48,13 @@ async function main() {
         const { time, ...rest } = built;
         summary = rest;
       } catch (err) {
-        failed.add(model.kind);
-        console.log(`  ${model.kind} unavailable: ${err.message}`);
+        failed.add(mode.id);
+        console.log(`  ${mode.id} unavailable: ${err.message}`);
         break;
       }
 
       const json = JSON.stringify({ ...summary, storedAt });
-      await writeFile(`${OUT}/${model.summaries}/${island.id}.json`, json);
+      await writeFile(`${OUT}/${mode.id}/${island.id}.json`, json);
 
       bytes += islandBytes;
       console.log(
@@ -68,7 +62,7 @@ async function main() {
       );
     }
 
-    console.log(`  ${model.kind} overlays ${(bytes / 1024 / 1024).toFixed(1)} MB`);
+    console.log(`  ${mode.id} overlays ${(bytes / 1024 / 1024).toFixed(1)} MB`);
   }
 
   for (const file of await readdir(DEM_DIR)) {

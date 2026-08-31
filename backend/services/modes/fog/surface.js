@@ -1,17 +1,17 @@
 import { readFileSync } from "node:fs";
 
-import { islands } from "../config/islands.js";
-import { fetchRetrying } from "./http.js";
-import { loadDem } from "./dem.js";
+import { islands } from "../../../config/islands.js";
+import { fetchRetrying } from "../../http.js";
+import { loadDem } from "../../dem.js";
 
 const API = "https://api.open-meteo.com/v1/forecast";
 
 const { forecastDays, fog } = JSON.parse(
-  readFileSync(new URL("../config/model.json", import.meta.url)),
+  readFileSync(new URL("../../../config/model.json", import.meta.url)),
 );
 
 const WEATHER_GRID_DEGREES = 0.0703125;
-const SOURCES = Object.values(fog.surface.layers).map(
+const SOURCES = Object.values(fog.layers).map(
   (layer) => layer.source,
 );
 

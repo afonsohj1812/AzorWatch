@@ -2,6 +2,11 @@
   "cellSize": 50,
   "forecastDays": 4,
 
+  "modes": [
+    { "id": "sea", "label": "Dive", "legendTitle": "CONDITIONS" },
+    { "id": "fog", "label": "Fog", "legendTitle": "VISIBILITY" }
+  ],
+
   "classes": {
     "none": { "color": "#dfdfdf", "rgb": [0, 0, 0, 0] },
     "green": { "color": "#3fff9f", "rgb": [63, 255, 159, 127] },
@@ -29,16 +34,15 @@
     "classThresholds": { "yellow": 10000, "orange": 1000, "red": 100 },
     "summary": { "coverage": { "yellow": 0.25, "orange": 0.5, "red": 0.75 } },
 
-    "surface": {
-      "ramp": ["green", "yellow", "orange", "red"],
-      "layers": {
-        "cloudCover": {
-          "source": "cloud_cover_low",
-          "label": "Cloud cover",
-          "unit": "%",
-          "min": 0,
-          "max": 100
-        }
+    "ramp": ["green", "yellow", "orange", "red"],
+
+    "layers": {
+      "cloudCover": {
+        "source": "cloud_cover_low",
+        "label": "Cloud cover",
+        "unit": "%",
+        "min": 0,
+        "max": 100
       }
     },
 

@@ -1,14 +1,14 @@
 import { readFileSync } from "node:fs";
 
-import { islands } from "../config/islands.js";
-import { fetchRetrying } from "./http.js";
-import { loadDem } from "./dem.js";
+import { islands } from "../../../config/islands.js";
+import { fetchRetrying } from "../../http.js";
+import { loadDem } from "../../dem.js";
 
 const MARINE_API = "https://marine-api.open-meteo.com/v1/marine";
 const WEATHER_API = "https://api.open-meteo.com/v1/forecast";
 
 const { cellSize, forecastDays, sea } = JSON.parse(
-  readFileSync(new URL("../config/model.json", import.meta.url)),
+  readFileSync(new URL("../../../config/model.json", import.meta.url)),
 );
 
 const BAND_CELLS = Math.round(sea.bandMeters / cellSize);

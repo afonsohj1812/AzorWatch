@@ -17,20 +17,6 @@ const swatch = computed(
   () => paletteFor(props.mode).find((c) => c.id === props.point?.class) ?? null,
 );
 
-const isNumber = (value) => Number.isFinite(value);
-
-const metres = (value) => `${Math.round(value).toLocaleString("en-GB")}m`;
-
-const depthText = computed(() => {
-  const p = props.point;
-  if (!p || p.sea) return null;
-  if (p.cloudy === false) return "No low cloud forecast";
-  if (p.aboveCloud) return "Above the cloud top";
-  return p.depth >= 0
-    ? `${metres(p.depth)} into the cloud`
-    : `${metres(-p.depth)} below the base`;
-});
-
 function meterFor(row) {
   const span = row.to - row.from;
   const at = (value) =>
@@ -54,7 +40,7 @@ function meterFor(row) {
   };
 }
 
-const seaRows = computed(() =>
+const rows = computed(() =>
   (props.point?.layers ?? []).map((row) => ({
     ...row,
     meter: row.ranges ? meterFor(row) : null,
@@ -64,72 +50,43 @@ const seaRows = computed(() =>
 
 <template>
   <div v-if="point" class="point-info glass">
-    <template v-if="mode === 'sea'">
-      <template v-if="point.offshore">
-        <div class="headline">Outside the band</div>
-        <div class="note">Conditions are modeled within 1 km of the coast</div>
-      </template>
-
-      <template v-else>
-        <div class="headline">
-          <span class="swatch" :style="{ background: swatch?.color }" />
-          <span>{{ swatch?.label }}</span>
-        </div>
-
-        <div class="gauges">
-          <div v-for="row in seaRows" :key="row.id" class="gauge">
-            <div class="head">
-              <span class="name">{{ row.label }}</span>
-              <span class="reading">
-                <span>{{ row.readout }}</span>
-                <span
-                  v-if="row.bearing !== null"
-                  class="arrow"
-                  :style="{ transform: `rotate(${row.bearing}deg)` }"
-                  >&#8593;</span
-                >
-              </span>
-            </div>
-
-            <span
-              v-if="row.meter"
-              class="meter"
-              :style="{ background: row.meter.background }"
-            >
-              <span class="marker" :style="{ left: `${row.meter.marker}%` }" />
-            </span>
-          </div>
-        </div>
-      </template>
-    </template>
-
-    <template v-else-if="point.sea">
-      <div class="headline">Sea</div>
-      <div class="note">No fog modeled over water</div>
+    <template v-if="point.outside">
+      <div class="headline">{{ point.headline }}</div>
+      <div class="note">{{ point.note }}</div>
     </template>
 
     <template v-else>
       <div class="headline">
         <span class="swatch" :style="{ background: swatch?.color }" />
-        <span>{{
-          point.visibility ? metres(point.visibility) : swatch?.label
-        }}</span>
+        <span>{{ point.headline ?? swatch?.label }}</span>
       </div>
 
-      <div class="note">{{ depthText }}</div>
+      <div v-if="point.note" class="note">{{ point.note }}</div>
 
-      <dl class="detail">
-        <dt>Elevation</dt>
-        <dd>{{ metres(point.elevation) }}</dd>
-        <template v-if="isNumber(point.cover)">
-          <dt>Cloud cover</dt>
-          <dd>{{ point.cover }}%</dd>
-        </template>
-        <template v-if="point.cloudy !== false">
-          <dt>Cloud</dt>
-          <dd>{{ metres(point.cloudBase) }} – {{ metres(point.cloudTop) }}</dd>
-        </template>
-      </dl>
+      <div v-if="rows.length" class="gauges">
+        <div v-for="row in rows" :key="row.id" class="gauge">
+          <div class="head">
+            <span class="name">{{ row.label }}</span>
+            <span class="reading">
+              <span>{{ row.readout }}</span>
+              <span
+                v-if="row.bearing !== null && row.bearing !== undefined"
+                class="arrow"
+                :style="{ transform: `rotate(${row.bearing}deg)` }"
+                >&#8593;</span
+              >
+            </span>
+          </div>
+
+          <span
+            v-if="row.meter"
+            class="meter"
+            :style="{ background: row.meter.background }"
+          >
+            <span class="marker" :style="{ left: `${row.meter.marker}%` }" />
+          </span>
+        </div>
+      </div>
     </template>
   </div>
 </template>

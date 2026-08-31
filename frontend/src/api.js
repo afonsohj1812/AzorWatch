@@ -8,18 +8,12 @@ export const isStatic = STATIC;
 export const islandsUrl = () => url(STATIC ? "islands.json" : "islands");
 
 export const summaryUrl = (mode, id) =>
-  mode === "sea"
-    ? url(STATIC ? `sea/${id}.json` : `sea/${id}`)
-    : url(STATIC ? `forecast/${id}.json` : `forecast/${id}`);
+  url(STATIC ? `${mode}/${id}.json` : `${mode}/${id}`);
 
 export const overlayUrl = (mode, id, time, layer) =>
-  url(
-    `${mode === "sea" ? "sea" : "fog"}/${id}/${layer ? `${layer}/` : ""}${time}.png`,
-  );
+  url(`${mode}/${id}/${layer ? `${layer}/` : ""}${time}.png`);
 
 export const pointUrl = (mode, id, time, x, y) =>
-  mode === "sea"
-    ? url(`sea/point/${id}/${time}?x=${x}&y=${y}`)
-    : url(`point/${id}/${time}?x=${x}&y=${y}`);
+  url(`${mode}/point/${id}/${time}?x=${x}&y=${y}`);
 
 export const demUrl = (id) => url(`dem/${id}.bin`);

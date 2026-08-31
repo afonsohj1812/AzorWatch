@@ -8,13 +8,14 @@ import {
   LAYER_SOURCES,
   SEA_CLASS_NAMES,
   SERIES,
-} from "./seaMath.js";
-import { loadDem } from "./dem.js";
-import { dayLabel, weekday } from "./dates.js";
+} from "./math.js";
+import { loadDem } from "../../dem.js";
+import { buildBlend as idwBlend } from "../../blend.js";
+import { groupDays, percentileClass } from "../../summary.js";
 import { getMarine } from "./marine.js";
 
 const config = JSON.parse(
-  readFileSync(new URL("../config/model.json", import.meta.url)),
+  readFileSync(new URL("../../../config/model.json", import.meta.url)),
 );
 
 const math = createSeaMath(config);
@@ -28,7 +29,6 @@ const SCORED = LAYER_LABELS.filter(({ id }) => config.sea.layers[id]);
 const CELL_SIZE = config.cellSize;
 const BAND_CELLS = Math.round(config.sea.bandMeters / config.cellSize);
 const NEIGHBORS = config.sea.neighbors;
-const IDW_EXPONENT = -config.sea.idwPower / 2;
 const NORMAL_RADIUS = config.sea.normalRadius ?? 0;
 const PERCENTILE = config.sea.summary.percentile;
 const HOURS_PER_DAY = 24;
@@ -75,64 +75,20 @@ function blurredCoast(coast, width, height) {
 }
 
 function buildBlend(dem, points) {
-  const { width, height, elevation, coast, ocean, bbox } = dem;
-  const [west, south, east, north] = bbox;
+  const { width, height, elevation, coast, ocean } = dem;
 
   const cells = [];
   for (let i = 0; i < coast.length; i++)
     if (elevation[i] === ocean && coast[i] >= 1 && coast[i] <= BAND_CELLS)
       cells.push(i);
 
-  const k = Math.min(NEIGHBORS, points.length);
-  const indices = new Uint8Array(cells.length * k);
-  const weights = new Float32Array(cells.length * k);
-  const scale = Math.cos((((south + north) / 2) * Math.PI) / 180);
-
-  const bestIndex = new Int32Array(k);
-  const bestDistance = new Float64Array(k);
-
-  for (let j = 0; j < cells.length; j++) {
-    const i = cells[j];
-    const x = i % width;
-    const y = (i / width) | 0;
-    const lon = west + ((x + 0.5) / width) * (east - west);
-    const lat = north - ((y + 0.5) / height) * (north - south);
-
-    bestDistance.fill(Infinity);
-
-    for (let p = 0; p < points.length; p++) {
-      const dx = (points[p].lon - lon) * scale;
-      const dy = points[p].lat - lat;
-      const distance = dx * dx + dy * dy;
-      if (distance >= bestDistance[k - 1]) continue;
-
-      let n = k - 1;
-      while (n > 0 && bestDistance[n - 1] > distance) {
-        bestDistance[n] = bestDistance[n - 1];
-        bestIndex[n] = bestIndex[n - 1];
-        n--;
-      }
-      bestDistance[n] = distance;
-      bestIndex[n] = p;
-    }
-
-    const base = j * k;
-
-    if (bestDistance[0] === 0) {
-      indices[base] = bestIndex[0];
-      weights[base] = 1;
-      continue;
-    }
-
-    let total = 0;
-    for (let n = 0; n < k; n++) {
-      const weight = Math.pow(bestDistance[n], IDW_EXPONENT);
-      indices[base + n] = bestIndex[n];
-      weights[base + n] = weight;
-      total += weight;
-    }
-    for (let n = 0; n < k; n++) weights[base + n] /= total;
-  }
+  const blend = idwBlend(
+    Int32Array.from(cells),
+    dem,
+    points,
+    NEIGHBORS,
+    config.sea.idwPower,
+  );
 
   const shore = new Float32Array(cells.length);
   const normalX = new Float32Array(cells.length);
@@ -162,15 +118,7 @@ function buildBlend(dem, points) {
     normalY[j] = Math.sin(bearing) * facing;
   }
 
-  return {
-    cells: Int32Array.from(cells),
-    indices,
-    weights,
-    k,
-    shore,
-    normalX,
-    normalY,
-  };
+  return { ...blend, shore, normalX, normalY };
 }
 
 function cellBlend(blend, j, into) {
@@ -214,66 +162,7 @@ function renderOverlay(png, cells, classes) {
 const round = (value, places) =>
   Number.isFinite(value) ? Number(value.toFixed(places)) : null;
 
-function findCell(cells, target) {
-  let low = 0;
-  let high = cells.length - 1;
-
-  while (low <= high) {
-    const mid = (low + high) >> 1;
-    if (cells[mid] === target) return mid;
-    if (cells[mid] < target) low = mid + 1;
-    else high = mid - 1;
-  }
-
-  return -1;
-}
-
-export function inspectSeaCell(dem, summary, hour, time, x, y) {
-  if (x < 0 || y < 0 || x >= dem.width || y >= dem.height) return null;
-
-  const blend = blendFor(summary.island, dem, summary.points);
-  const j = findCell(blend.cells, y * dem.width + x);
-  if (j === -1) return { time, x, y, offshore: true };
-
-  const slots = Array.from({ length: blend.k }, () => ({
-    index: 0,
-    weight: 0,
-  }));
-
-  const { score, cell } = math.scoreCell(
-    summary.points,
-    cellBlend(blend, j, slots),
-    hour,
-    cellAt(blend, j),
-  );
-
-  return {
-    time,
-    x,
-    y,
-    offshore: false,
-    shore: Math.round(blend.shore[j]),
-    class: SEA_CLASS_NAMES[math.classify(score)],
-    score: round(score, 3),
-    layers: math.describe(cell).map((entry) => ({
-      ...entry,
-      penalty: round(entry.penalty, 3),
-      value: round(entry.value, 3),
-    })),
-  };
-}
-
-function percentileClass(counts, total) {
-  const target = PERCENTILE * total;
-  let seen = 0;
-
-  for (let c = 0; c < counts.length; c++) {
-    seen += counts[c];
-    if (seen >= target) return c;
-  }
-
-  return counts.length - 1;
-}
+export const inspectSeaCell = math.inspect;
 
 export async function buildSeaForecast(id, onOverlay) {
   const marine = await getMarine();
@@ -351,9 +240,9 @@ export async function buildSeaForecast(id, onOverlay) {
       });
     }
 
-    hourClass[hour] = percentileClass(counts, cells.length);
+    hourClass[hour] = percentileClass(counts, cells.length, PERCENTILE);
     for (let li = 0; li < SCORED.length; li++)
-      layerHourClass[li][hour] = percentileClass(layerCounts[li], cells.length);
+      layerHourClass[li][hour] = percentileClass(layerCounts[li], cells.length, PERCENTILE);
 
     if (onOverlay) {
       await onOverlay({
@@ -375,37 +264,21 @@ export async function buildSeaForecast(id, onOverlay) {
   const dayClassOf = (series, start) => {
     const slice = Array.from(series.slice(start, start + HOURS_PER_DAY));
     slice.sort((a, b) => a - b);
-    return SEA_CLASS_NAMES[slice[Math.round(PERCENTILE * (slice.length - 1))]];
+    return slice[Math.round(PERCENTILE * (slice.length - 1))];
   };
 
-  const days = [];
-  for (let day = 0; day < hours / HOURS_PER_DAY; day++) {
-    const start = day * HOURS_PER_DAY;
-    const date = marine.time[marine.historyHours + start].slice(0, 10);
-
-    days.push({
-      date,
-      label: dayLabel(date),
-      weekday: weekday(date),
-      seaClass: dayClassOf(hourClass, start),
-      layerClass: Object.fromEntries(
-        SCORED.map(({ id: layer }, li) => [
-          layer,
-          dayClassOf(layerHourClass[li], start),
-        ]),
-      ),
-      hours: Array.from({ length: HOURS_PER_DAY }, (_, h) => ({
-        time: marine.time[marine.historyHours + start + h],
-        seaClass: SEA_CLASS_NAMES[hourClass[start + h]],
-        layerClass: Object.fromEntries(
-          SCORED.map(({ id: layer }, li) => [
-            layer,
-            SEA_CLASS_NAMES[layerHourClass[li][start + h]],
-          ]),
-        ),
-      })),
-    });
-  }
+  const days = groupDays({
+    times: marine.time.slice(marine.historyHours),
+    hourClass,
+    names: SEA_CLASS_NAMES,
+    dayOf: dayClassOf,
+    layers: Object.fromEntries(
+      SCORED.map(({ id: layer }, li) => [
+        layer,
+        { series: layerHourClass[li], names: SEA_CLASS_NAMES, dayOf: dayClassOf },
+      ]),
+    ),
+  });
 
   return {
     island: id,

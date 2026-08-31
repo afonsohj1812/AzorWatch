@@ -1,3 +1,5 @@
+import { nearestPoints } from "../../blend.js";
+
 export const FOG_CLASS = { NONE: 0, YELLOW: 1, ORANGE: 2, RED: 3 };
 
 export const FOG_CLASS_NAMES = ["none", "yellow", "orange", "red"];
@@ -7,6 +9,7 @@ export const OCEAN = -32768;
 const radians = (degrees) => (degrees * Math.PI) / 180;
 
 export function createFogMath(config) {
+  const COVER_SOURCE = config.fog.layers.cloudCover.source;
   const {
     cloudBase: cloudBaseConfig,
     cloudTop: cloudTopConfig,
@@ -185,6 +188,87 @@ export function createFogMath(config) {
     return classes;
   }
 
+  const metres = (value) => `${Math.round(value).toLocaleString("en-GB")}m`;
+
+  function coverAt(dem, points, hour, x, y) {
+    if (!points?.length) return null;
+
+    const [west, south, east, north] = dem.bbox;
+    const lon = west + ((x + 0.5) / dem.width) * (east - west);
+    const lat = north - ((y + 0.5) / dem.height) * (north - south);
+
+    let value = 0;
+    let weight = 0;
+
+    for (const { index, weight: share } of nearestPoints(
+      lat,
+      lon,
+      points,
+      config.sea.neighbors,
+      config.sea.idwPower,
+    )) {
+      const reading = points[index][COVER_SOURCE]?.[hour];
+      if (!Number.isFinite(reading)) continue;
+      value += reading * share;
+      weight += share;
+    }
+
+    return weight ? Math.round(value / weight) : null;
+  }
+
+  function inspect(dem, doc, hour, time, x, y) {
+    if (x < 0 || y < 0 || x >= dem.width || y >= dem.height) return null;
+
+    const index = y * dem.width + x;
+    const z = dem.elevation[index];
+    const base = { time, x, y };
+
+    if (z === OCEAN)
+      return {
+        ...base,
+        outside: true,
+        headline: "Sea",
+        note: "No fog modeled over water",
+      };
+
+    const c = doc.conditions[hour];
+    const cloudBase = localBase(dem.aspect[index], dem.slope[index], c);
+    const fogClass = classifyCell(z, cloudBase, c);
+    const visibility = visibilityAt(z, cloudBase, fogClass, c);
+    const cloudy = hasCloud(c);
+    const depth = Math.round(z - cloudBase);
+
+    const layers = [{ id: "elevation", label: "Elevation", readout: metres(z) }];
+
+    const cover = coverAt(dem, doc.points, hour, x, y);
+    if (Number.isFinite(cover))
+      layers.push({ id: "cover", label: "Cloud cover", readout: `${cover}%` });
+
+    if (cloudy)
+      layers.push({
+        id: "cloud",
+        label: "Cloud",
+        readout: `${metres(cloudBase)} - ${metres(c.top)}`,
+      });
+
+    const note = !cloudy
+      ? "No low cloud forecast"
+      : z > c.top
+        ? "Above the cloud top"
+        : depth >= 0
+          ? `${metres(depth)} into the cloud`
+          : `${metres(-depth)} below the base`;
+
+    return {
+      ...base,
+      outside: false,
+      class: FOG_CLASS_NAMES[fogClass],
+      headline: visibility ? metres(visibility) : null,
+      note,
+      layers,
+    };
+  }
+
   return {
     hourConditions,
     hasCloud,
@@ -192,5 +276,6 @@ export function createFogMath(config) {
     classifyCell,
     classifyHour,
     visibilityAt,
+    inspect,
   };
 }

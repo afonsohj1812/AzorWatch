@@ -1,4 +1,4 @@
-import { decayed, ramp } from "../curve.js";
+import { decayed, ramp } from "../../../curve.js";
 
 const clearAt = (turbidity, config) =>
   config.clear *
