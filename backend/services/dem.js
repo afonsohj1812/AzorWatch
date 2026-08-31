@@ -5,6 +5,7 @@ import { pipeline } from "node:stream/promises";
 
 import { islands } from "../config/islands.js";
 import { parseDem } from "./demFormat.js";
+import { sampleByGrid } from "./utils.js";
 
 const DEM_DIR = "data/dem";
 const CACHE_DIR = "data/cache";
@@ -545,4 +546,21 @@ export async function loadDem(id) {
 
   cache.set(id, dem);
   return dem;
+}
+
+export async function sampleIslands(degrees, acceptFor) {
+  const requests = [];
+  const byIsland = {};
+
+  for (const island of islands) {
+    const dem = await loadDem(island.id);
+    byIsland[island.id] = [];
+
+    for (const point of sampleByGrid(dem, degrees, acceptFor(dem))) {
+      byIsland[island.id].push(requests.length);
+      requests.push(point);
+    }
+  }
+
+  return { requests, byIsland };
 }

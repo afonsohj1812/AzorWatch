@@ -1,5 +1,4 @@
-import { degreesToVector } from "../../curve.js";
-import { nearestPoints } from "../../blend.js";
+import { cellCenter, degreesToVector, nearestPoints } from "../../utils.js";
 import { LAYERS } from "./layers/index.js";
 
 export const SEA_CLASS_NAMES = ["green", "yellow", "orange", "red"];
@@ -212,9 +211,7 @@ export function createSeaMath(config) {
         note: `Conditions are modeled within ${config.sea.bandMeters / 1000}km of the coast`,
       };
 
-    const [west, south, east, north] = dem.bbox;
-    const lon = west + ((x + 0.5) / dem.width) * (east - west);
-    const lat = north - ((y + 0.5) / dem.height) * (north - south);
+    const { lon, lat } = cellCenter(dem, x, y);
 
     const gx = (dem.coast[index + 1] - dem.coast[index - 1]) / 2;
     const gy = (dem.coast[index + dem.width] - dem.coast[index - dem.width]) / 2;

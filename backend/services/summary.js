@@ -1,6 +1,19 @@
-import { dayLabel, weekday } from "./dates.js";
-
 const HOURS_PER_DAY = 24;
+
+const asUtc = (date) => new Date(`${date}T00:00:00Z`);
+
+const dayLabel = (date) =>
+  asUtc(date).toLocaleDateString("en-GB", {
+    day: "numeric",
+    month: "short",
+    timeZone: "UTC",
+  });
+
+const weekday = (date) =>
+  asUtc(date).toLocaleDateString("en-GB", {
+    weekday: "short",
+    timeZone: "UTC",
+  });
 
 export function percentileClass(counts, total, percentile) {
   const target = percentile * total;

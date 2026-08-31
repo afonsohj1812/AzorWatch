@@ -5,7 +5,7 @@ import { createFogMath, FOG_CLASS, FOG_CLASS_NAMES, OCEAN } from "./math.js";
 import { loadDem } from "../../dem.js";
 import { getForecast } from "./forecast.js";
 import { getSurface } from "./surface.js";
-import { buildBlend, blendSeries } from "../../blend.js";
+import { buildBlend, blendSeries, paint } from "../../utils.js";
 import { groupDays, percentileClass } from "../../summary.js";
 
 const config = JSON.parse(
@@ -67,21 +67,7 @@ function landBlend(id, dem, points) {
 }
 
 function renderRamp(png, blend, bins) {
-  for (let j = 0; j < blend.cells.length; j++) {
-    const p = blend.cells[j] * 4;
-
-    if (bins[j] === 255) {
-      png.data[p + 3] = 0;
-      continue;
-    }
-
-    const [r, g, b, a] = RAMP_PALETTE[bins[j]];
-    png.data[p] = r;
-    png.data[p + 1] = g;
-    png.data[p + 2] = b;
-    png.data[p + 3] = a;
-  }
-
+  paint(png.data, blend.cells, bins, RAMP_PALETTE);
   return PNG.sync.write(png);
 }
 const NEIGHBORS = config.sea.neighbors;
@@ -96,16 +82,7 @@ function landMask(dem) {
 
 function renderOverlay(classes, width, height) {
   const png = new PNG({ width, height });
-
-  for (let i = 0; i < classes.length; i++) {
-    const [r, g, b, a] = PALETTE[classes[i]];
-    const p = i * 4;
-    png.data[p] = r;
-    png.data[p + 1] = g;
-    png.data[p + 2] = b;
-    png.data[p + 3] = a;
-  }
-
+  paint(png.data, null, classes, PALETTE);
   return PNG.sync.write(png);
 }
 

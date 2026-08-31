@@ -35,7 +35,7 @@ function choose(id) {
     <button
       v-for="island in islands"
       :key="island.id"
-      class="island"
+      class="island pill"
       :class="{ active: island.id === modelValue }"
       type="button"
       @click="choose(island.id)"
@@ -54,30 +54,8 @@ function choose(id) {
 }
 
 .island {
-  font-size: 0.75rem;
-  font-weight: bold;
   position: relative;
-  padding: 0.5rem 0.75rem;
-  background: none;
-  border: none;
-  border-radius: 0.25rem;
   text-align: left;
-  cursor: pointer;
-  transition:
-    background 0.1s ease,
-    color 0.1s ease;
-}
-
-.island:hover {
-  color: rgb(255, 255, 255);
-  background: rgb(255 255 255 / 0.1);
-}
-
-.island.active {
-  font-weight: bold;
-  color: rgb(255, 255, 255);
-  background: rgb(255 255 255 / 0.25);
-  box-shadow: inset 0 0 0 1px rgb(255 255 255 / 0.25);
 }
 
 .island.active::before {

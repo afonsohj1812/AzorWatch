@@ -1,4 +1,4 @@
-import { nearestPoints } from "../../blend.js";
+import { cellCenter, nearestPoints } from "../../utils.js";
 
 export const FOG_CLASS = { NONE: 0, YELLOW: 1, ORANGE: 2, RED: 3 };
 
@@ -193,9 +193,7 @@ export function createFogMath(config) {
   function coverAt(dem, points, hour, x, y) {
     if (!points?.length) return null;
 
-    const [west, south, east, north] = dem.bbox;
-    const lon = west + ((x + 0.5) / dem.width) * (east - west);
-    const lat = north - ((y + 0.5) / dem.height) * (north - south);
+    const { lon, lat } = cellCenter(dem, x, y);
 
     let value = 0;
     let weight = 0;

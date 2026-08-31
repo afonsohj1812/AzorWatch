@@ -10,7 +10,7 @@ import {
   SERIES,
 } from "./math.js";
 import { loadDem } from "../../dem.js";
-import { buildBlend as idwBlend } from "../../blend.js";
+import { buildBlend as idwBlend, paint } from "../../utils.js";
 import { groupDays, percentileClass } from "../../summary.js";
 import { getMarine } from "./marine.js";
 
@@ -147,15 +147,7 @@ function blendFor(id, dem, points) {
 }
 
 function renderOverlay(png, cells, classes) {
-  for (let j = 0; j < cells.length; j++) {
-    const [r, g, b, a] = PALETTE[classes[j]];
-    const p = cells[j] * 4;
-    png.data[p] = r;
-    png.data[p + 1] = g;
-    png.data[p + 2] = b;
-    png.data[p + 3] = a;
-  }
-
+  paint(png.data, cells, classes, PALETTE);
   return PNG.sync.write(png);
 }
 

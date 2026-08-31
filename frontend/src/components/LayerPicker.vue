@@ -11,7 +11,7 @@ defineEmits(["update:modelValue"]);
     <button
       v-for="entry in entries"
       :key="entry.id"
-      class="chip"
+      class="chip pill"
       :class="{ active: entry.id === modelValue }"
       type="button"
       @click="$emit('update:modelValue', entry.id)"
@@ -32,28 +32,8 @@ defineEmits(["update:modelValue"]);
 }
 
 .chip {
-  font-size: 0.75rem;
-  font-weight: bold;
   padding: 0.4rem 0.75rem;
-  background: none;
-  border: none;
-  border-radius: 0.25rem;
   white-space: nowrap;
-  cursor: pointer;
-  transition:
-    background 0.1s ease,
-    color 0.1s ease;
-}
-
-.chip:hover {
-  color: rgb(255, 255, 255);
-  background: rgb(255 255 255 / 0.1);
-}
-
-.chip.active {
-  color: rgb(255, 255, 255);
-  background: rgb(255 255 255 / 0.25);
-  box-shadow: inset 0 0 0 1px rgb(255 255 255 / 0.25);
 }
 
 @media (max-width: 768px) {
