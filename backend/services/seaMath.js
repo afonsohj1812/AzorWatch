@@ -24,7 +24,19 @@ export const SERIES = LAYERS.flatMap((layer) =>
 export const LAYER_LABELS = LAYERS.map((layer) => ({
   id: layer.id,
   label: layer.label,
+  unit: layer.unit ?? "",
 }));
+
+export function anchorsOf(ranges) {
+  const first = ranges[0];
+  const last = ranges[ranges.length - 1];
+
+  return [
+    first - (ranges[1] - first),
+    ...ranges,
+    last + (last - ranges[ranges.length - 2]),
+  ];
+}
 
 export function nearestPoints(lat, lon, points, count, power) {
   const scale = Math.cos((lat * Math.PI) / 180);
@@ -141,7 +153,7 @@ export function createSeaMath(config) {
   function grade(value, config) {
     if (!Number.isFinite(value)) return 1;
 
-    const anchors = [config.perfect, ...config.ranges, config.undivable];
+    const anchors = anchorsOf(config.ranges);
 
     for (let i = 0; i < anchors.length - 1; i++) {
       const from = anchors[i];
@@ -154,10 +166,9 @@ export function createSeaMath(config) {
       return LEVELS[i] + share * (LEVELS[i + 1] - LEVELS[i]);
     }
 
-    const worseUpward = config.undivable > config.perfect;
-    const better = worseUpward
-      ? value < config.perfect
-      : value > config.perfect;
+    const perfect = anchors[0];
+    const worseUpward = anchors[anchors.length - 1] > perfect;
+    const better = worseUpward ? value < perfect : value > perfect;
 
     return better ? 0 : 1;
   }
@@ -187,8 +198,8 @@ export function createSeaMath(config) {
         readout: layer.readout?.(cell, config) ?? null,
         bearing: cell[`${layer.id}Bearing`] ?? null,
         value: valueOf(layer, cell),
-        from: config.perfect,
-        to: config.undivable,
+        from: anchorsOf(config.ranges)[0],
+        to: anchorsOf(config.ranges).at(-1),
         ranges: config.ranges,
       };
     });

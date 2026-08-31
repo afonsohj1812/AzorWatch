@@ -14,6 +14,7 @@ function rateAt(values, index) {
 export default {
   id: "tide",
   label: "Tide",
+  unit: "m/h",
   source: "sea_level_height_msl",
 
   series: {

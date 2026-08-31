@@ -7,6 +7,7 @@ const clearAt = (turbidity, config) =>
 export default {
   id: "visibility",
   label: "Visibility",
+  unit: "m",
 
   series: {
     stir: (point, index, config) =>

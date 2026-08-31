@@ -54,12 +54,10 @@
     "bandMeters": 1000,
 
     "layers": {
-      "wave": { "weight": 5.0, "perfect": 0.5, "ranges": [0.9, 1.25, 1.6], "undivable": 2.0 },
+      "wave": { "weight": 4.0, "ranges": [1, 1.25, 1.5] },
       "visibility": {
         "weight": 2.0,
-        "perfect": 20,
-        "ranges": [16, 12, 8],
-        "undivable": 4,
+        "ranges": [20, 15, 10],
         "clear": 30,
         "atOneMeter": 18.6,
         "shoreRange": 1500,
@@ -69,8 +67,8 @@
         "runoff": { "weight": 2, "hours": 48, "decay": 0.95 },
         "light": { "weight": 0.3, "from": 400, "to": 20 }
       },
-      "wind": { "weight": 2.5, "perfect": 0, "ranges": [15, 30, 45], "undivable": 60 },
-      "tide": { "weight": 2.0, "perfect": 0.25, "ranges": [0.19, 0.13, 0.06], "undivable": 0, "falling": 0.5 }
+      "wind": { "weight": 4, "ranges": [15, 30, 45] },
+      "tide": { "weight": 1, "ranges": [0.15, 0.1, 0.05], "falling": 0.5 }
     },
 
     "exposure": { "wave": 0.5, "wind": 0.5 },

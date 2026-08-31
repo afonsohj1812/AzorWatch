@@ -1,6 +1,7 @@
 export default {
   id: "wind",
   label: "Wind",
+  unit: "km/h",
   source: "wind_speed_10m",
   direction: "wind_direction_10m",
   exposed: true,
